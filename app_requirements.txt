@@ -1,0 +1,7 @@
+# pip install -r app_requirements.txt
+
+cryptography==43.0.0
+netmiko==4.4.0
+pandas==2.2.2
+PyQt5==5.15.11
+PyQt5_sip==12.15.0

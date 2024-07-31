@@ -62,8 +62,9 @@ The Net Interactive Command Executor is a Python application designed to facilit
    - Monitor Progress: View the progress and logs in the GUI.
 
 3. Files and Logging:
-   - Successful Logs: Stored in the `logs/successful/` directory.
-   - Failed Logs: Stored in the `logs/failure/failed_devices.txt`.
+   - Output Logs: `logs/output/files`.
+   - Successful Logs: Stored in the `logs/successful/files`.
+   - Failed Logs: Stored in the `logs/failure/files`.
 
  Script Functions
 
