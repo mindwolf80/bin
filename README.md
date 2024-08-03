@@ -3,130 +3,95 @@
 
 # Net Interactive Command Executor
 
- Overview
+This script automates the process of connecting to network devices, executing commands, and saving the output to various file formats. It supports multiple device types and allows the user to choose between direct session input and file-based input.
 
-The Net Interactive Command Executor is a Python application designed to facilitate the execution of network commands on devices using the Netmiko library. This script allows users to input device information and commands either manually or via a file, and it provides a graphical user interface (GUI) for ease of use.
+## Features
 
- Features
+- Supports various network device types (Cisco ASA, Cisco IOS, Linux, etc.).
+- Connects to devices via SSH using Netmiko.
+- Executes a list of commands on each device.
+- Saves output in CSV, XLSX, and TXT formats.
+- Provides progress updates using tqdm progress bars.
+- Allows for pause options between device connections.
 
-- GUI Interface: Built using PyQt5, the application offers a modern interface for interacting with network devices.
-- Device Command Execution: Connects to network devices using Netmiko, executes commands, and logs outputs.
-- File Support: Reads device information and commands from TXT, CSV, or XLSX files.
-- Logging: Provides detailed logging of successful and failed command executions.
-- Progress Tracking: Displays progress updates and handles user cancellation.
-
- Requirements
+## Requirements
 
 - Python 3.x
-- PyQt5
-- Netmiko
-- pandas
-- cryptography
+- Required Python Packages:
+  - pandas
+  - netmiko
+  - cryptography
+  - tqdm
+  - openpyxl
 
- Installation
+## Installation
 
-1. Clone the Repository:
+1. Install Python: Download and install Python from the [official Python website](https://www.python.org/).
+2. Create a Virtual Environment (Optional but recommended):
    
-   git clone https://github.com/mindwolf80/Lab.git
-   cd Lab
+   python -m venv myenv
+   source myenv/bin/activate   # On Windows use myenv\Scripts\activate
+   
+3. Install Required Packages:
+   
+   pip install pandas netmiko cryptography tqdm openpyxl
+   
+4. Suggested Packages:
+
+   pip install pip-review pyinstaller ruff
+   
+5. PY ► EXE:
+
+   pyinstaller --clean --onefile --noconsole --name=nice-1.4.0.exe nice_1_4_0_nogui.py
+
    
 
-2. Install Dependencies:
-   
-   pip install -r requirements.txt
-   
+## Usage
 
-   *Create a `requirements.txt` file with the following content if it does not exist:*
+1. Save the script to a file named nice_1_4_nogui.py.
+2. Run the script:
    
-   pyqt5
-   netmiko
-   pandas
-   cryptography
+   py nice_1_4_nogui.py
    
 
- Usage
+3. Follow the on-screen prompts to:
+   - Select device type.
+   - Enter authentication details.
+   - Choose between direct session or file list.
+   - If using file list, provide the file path.
+   - Select pause option.
+   - Choose output format(s).
 
-1. Run the Application:
-   
-   python nice.py (via cmd/shell)
-    
-	 OR
-	 
-   nice.exe
+## File Format
 
-2. Using the GUI:
-   - Enter Device Credentials: Provide the username, password, and enable secret if needed.
-   - Select Device File: Choose a file containing device information and commands.
-   - Input Commands: You can enter commands manually or load them from the selected file.
-   - Execute Commands: Click the "Run" button to start executing commands on the devices.
-   - Monitor Progress: View the progress and logs in the GUI.
+- CSV or XLSX File Requirements:
+  - The file must contain the following headers: ip,dns,command. (no space in-between comma delimiters)
 
-3. Files and Logging:
-   - Output Logs: `logs/output/files`.
-   - Successful Logs: Stored in the `logs/successful/files`.
-   - Failed Logs: Stored in the `logs/failure/files`.
+## Example
 
- Script Functions
+To run the script and connect to a Linux device, follow these steps:
 
-- `read_device_info(file_path, file_type)`: Reads device information and commands from a file.
-- `create_directories()`: Creates necessary directories for logging.
-- `execute_commands_on_devices(...)`: Executes commands on devices and handles connections.
-- `run_script(...)`: Executes the main logic for running commands based on user input.
-- `clear_log(log_text_edit, progress_bar)`: Clears the log and resets the progress bar.
-- `cancel_execution_function()`: Sets a flag to cancel the execution of commands.
+1. Select linux as the device type.
+2. Enter your SSH username and password.
+3. Choose direct session or file list.
+4. Enter the commands to execute or provide the file path.
+5. Choose the pause option between connections.
+6. Select the desired output format(s).
+7. Confirm and run the script.
 
- Troubleshooting
+The script will display progress updates and save the output to the specified format(s).
 
-# Common Issues
+## License
 
-1. Failed to Connect to Device:
-   - Possible Causes:
-     - Incorrect IP address or hostname.
-     - Device is not reachable or down.
-     - Network issues or firewall blocking access.
-   - Solutions:
-     - Verify the IP address and hostname in your device file.
-     - Check device status and network connectivity.
-     - Ensure that there are no firewalls blocking the connection.
+This project is licensed under the MIT License.
 
-2. Authentication Errors:
-   - Possible Causes:
-     - Incorrect username or password.
-     - Wrong enable secret.
-   - Solutions:
-     - Double-check the username and password.
-     - Ensure the correct enable secret is provided if required.
+## Acknowledgements
 
-3. Command Execution Errors:
-   - Possible Causes:
-     - Incorrect command syntax.
-     - Commands not supported on the device.
-   - Solutions:
-     - Review the command syntax and ensure compatibility with the device.
-
-4. GUI Not Displaying Properly:
-   - Possible Causes:
-     - Missing or incompatible PyQt5 installation.
-   - Solutions:
-     - Ensure PyQt5 is installed correctly with `pip install pyqt5`.
-     - Verify that you are using a compatible version of Python and PyQt5.
-
-5. File Reading Issues:
-   - Possible Causes:
-     - Incorrect file path or format.
-     - Corrupted or improperly formatted file.
-   - Solutions:
-     - Check the file path and ensure it is correct.
-     - Verify the file format and content. For CSV and XLSX, ensure proper formatting.
-
-# Additional Help
-
-- Consult the Documentation: Refer to the [Netmiko Documentation](https://netmiko.readthedocs.io/) for details on supported devices and commands.
-- Check Logs: Review the log files in `logs/successful/` and `logs/failure/` for detailed error messages.
-- Contact Support: If you encounter persistent issues, consider reaching out for help on forums or communities related to Netmiko and PyQt5.
-
- License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This script utilizes the following open-source libraries:
+- [Netmiko](https://github.com/ktbyers/netmiko)
+- [pandas](https://github.com/pandas-dev/pandas)
+- [tqdm](https://github.com/tqdm/tqdm)
+- [openpyxl](https://openpyxl.readthedocs.io/)
 
 ---
+

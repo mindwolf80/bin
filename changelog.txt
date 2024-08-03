@@ -1,0 +1,26 @@
+2024-08-02 22:27:05
+Author: Jason Woringen
+
+---
+
+# Changelog
+
+## [Update 5]
+
+### Added
+
+- No GUI: faster and more stable.
+- Lots of code cleanup and restructuring to be modular.
+- Support for multiple network device types (Cisco ASA, Cisco IOS, Linux, etc.).
+- Output in multiple formats: CSV, XLSX, TXT.
+- Progress bar for device processing using `tqdm`.
+- Directory creation for logs and outputs.
+- Validation for required file headers (`ip`, `dns`, `command`).
+
+### Fixed
+- Correct handling of incorrect file inputs by prompting the user to retry instead of exiting.
+- Proper selection of output formats through a menu-driven interface.
+
+---
+
+This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.
