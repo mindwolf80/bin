@@ -6,6 +6,7 @@ from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticati
 from cryptography.utils import CryptographyDeprecationWarning
 import warnings
 from tqdm import tqdm
+import logging
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning, module='paramiko')
@@ -15,6 +16,13 @@ warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning, modul
 # Global variable to control execution
 cancel_execution = False
 
+# Configure logging
+logging.basicConfig(
+    filename='general_log.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 # Configuration and utility functions
 class Config:
     DEVICE_TYPES = ['cisco_asa', 'cisco_ftd', 'cisco_nxos', 'cisco_ios', 'f5_linux', 'f5_tmsh', 'linux', 'paloalto_panos']
@@ -22,10 +30,8 @@ class Config:
     REQUIRED_HEADERS = ["ip", "dns", "command"]
     LOG_DIR = 'logs'
     OUTPUT_SUBDIR = 'output'
-    FAILURE_SUBDIR = 'failure'
 
 def create_directories():
-    os.makedirs(os.path.join(Config.LOG_DIR, Config.FAILURE_SUBDIR), exist_ok=True)
     os.makedirs(os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR), exist_ok=True)
 
 # Device Manager class
@@ -68,29 +74,33 @@ class DeviceConnection:
     def connect(self):
         try:
             self.connection = ConnectHandler(**self.device)
-            print(f"Connected to device {self.device['ip']}.\n")
+            logging.info(f"Connected to device {self.device['ip']}.")
+            if self.device['device_type'] == 'cisco_asa':
+                self.connection.enable()  # Use the same password for enable
+                logging.info(f"Entered enable mode on {self.device['ip']}.")
         except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
-            print(f"Failed to connect to device {self.device['ip']}: {e}\n")
+            logging.error(f"Failed to connect to device {self.device['ip']}: {e}")
             self.connection = None
         return self.connection
 
     def disconnect(self):
         if self.connection:
             self.connection.disconnect()
+            logging.info(f"Disconnected from device {self.device['ip']}.")
 
     def execute_commands(self, commands):
         outputs = []
         if not self.connection:
-            print(f"Cannot execute commands on device {self.device['ip']} because the connection was not established.")
+            logging.error(f"Cannot execute commands on device {self.device['ip']} because the connection was not established.")
             return outputs
         
         for command in commands:
             try:
                 output = self.connection.send_command_timing(command, read_timeout=60)
-                print(f"Output for command '{command}':\n{output}\n")
+                # Do not log command outputs to general log
                 outputs.append(output)
             except Exception as e:
-                print(f"Error executing command '{command}' on device {self.device['ip']}: {e}")
+                logging.error(f"Error executing command '{command}' on device {self.device['ip']}: {e}")
                 outputs.append(f"Error executing command '{command}': {e}")
         
         return outputs
@@ -145,7 +155,7 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
 
     for index, ((ip, dns), commands) in enumerate(devices.items()):
         if cancel_execution:
-            print("Execution canceled by user.\n")
+            logging.info("Execution canceled by user.")
             break
         
         device = {
@@ -166,7 +176,7 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
             any_success = True
 
         if pause_option == 'timeout' and timeout > 0:
-            print(f"Pausing for {timeout} seconds...")
+            logging.info(f"Pausing for {timeout} seconds...")
             time.sleep(timeout)
         elif pause_option == 'keypress':
             input("Press Enter to continue to the next device...")
@@ -193,15 +203,15 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
         if output_formats["txt"]:
             OutputManager.save_output_to_txt(all_outputs, output_file_paths["txt"])
 
-    print("\nScript execution completed.\n")
+    logging.info("Script execution completed.")
     if any_success:
-        print("Combined output files saved at:\n")
+        logging.info("Combined output files saved at:")
         if output_formats["csv"]:
-            print(f"- {output_file_paths['csv']}\n")
+            logging.info(f"- {output_file_paths['csv']}")
         if output_formats["xlsx"]:
-            print(f"- {output_file_paths['xlsx']}\n")
+            logging.info(f"- {output_file_paths['xlsx']}")
         if output_formats["txt"]:
-            print(f"- {output_file_paths['txt']}\n")
+            logging.info(f"- {output_file_paths['txt']}")
 
 # Main function to run the script
 def run_script():

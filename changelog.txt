@@ -25,6 +25,10 @@ Author: Jason Woringen
 - Netmiko handles enable secret 
 - keep window open after session
 
+3:31 PM 8/4/2024
+- automtic enable secret for ASA.
+- improved general logging.
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.
