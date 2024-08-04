@@ -21,6 +21,10 @@ Author: Jason Woringen
 - Correct handling of incorrect file inputs by prompting the user to retry instead of exiting.
 - Proper selection of output formats through a menu-driven interface.
 
+1:49 AM 8/4/2024
+- Netmiko handles enable secret 
+- keep window open after session
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.

@@ -77,13 +77,6 @@ class DeviceConnection:
         if self.connection:
             self.connection.disconnect()
 
-    def handle_enable_secret(self, secret):
-        try:
-            self.connection.enable(secret=secret)
-            print("Entered enable mode.\n")
-        except Exception as e:
-            print(f"Failed to enter enable mode: {e}\n")
-
     def execute_commands(self, commands):
         outputs = []
         for command in commands:
@@ -111,13 +104,10 @@ class OutputManager:
                 file.write(output + "\n")
 
 # Function to display selected options
-def display_options(username, password, use_secret, secret, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats):
+def display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats):
     print("\nYou have selected the following options:")
     print(f"Username: {username}")
     print(f"Password: {'*' * len(password)}")
-    print(f"Use Enable Secret: {use_secret}")
-    if use_secret:
-        print(f"Enable Secret: {'*' * len(secret)}")
     print(f"Action Choice: {action_choice}")
     if action_choice == 'direct':
         for (ip, dns), commands in devices.items():
@@ -136,7 +126,7 @@ def display_options(username, password, use_secret, secret, action_choice, devic
     print("\nPress 1 to run the script or 9 to cancel.")
 
 # Function to execute the workflow
-def execute_workflow(devices, username, password, secret, use_secret, output_formats, device_type, pause_option, timeout, input_file_name):
+def execute_workflow(devices, username, password, output_formats, device_type, pause_option, timeout, input_file_name):
     create_directories()
     all_outputs = []
     any_success = False
@@ -152,13 +142,14 @@ def execute_workflow(devices, username, password, secret, use_secret, output_for
             'device_type': device_type,
             'ip': ip,
             'username': username,
-            'password': password
+            'password': password,
         }
+        
+        if device_type == 'cisco_asa':
+            device['secret'] = password  # Automatically use the same password as the enable secret
         
         connection = DeviceConnection(device)
         if connection.connect():
-            if use_secret:
-                connection.handle_enable_secret(secret)
             outputs = connection.execute_commands(commands)
             all_outputs.extend([[dns, ip, cmd, out] for cmd, out in zip(commands, outputs)])
             connection.disconnect()
@@ -218,9 +209,6 @@ def run_script():
         selected_device_type = 'linux'
     else:
         selected_device_type = Config.DEVICE_TYPES[device_type_index]
-
-    use_secret = selected_device_type == 'cisco_asa'
-    secret = input("Enter Enable Secret: ") if use_secret else ''
 
     username = input("Enter Username: ")
     password = input("Enter Password: ")
@@ -318,13 +306,13 @@ def run_script():
         if any(output_formats.values()):
             break
 
-    display_options(username, password, use_secret, secret, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats)
+    display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats)
     user_choice = input().strip()
     if user_choice != '1':
         print("Operation cancelled.")
         return
 
-    execute_workflow(devices, username, password, secret, use_secret, output_formats, selected_device_type, pause_option, timeout, input_file_name)
+    execute_workflow(devices, username, password, output_formats, selected_device_type, pause_option, timeout, input_file_name)
 
 if __name__ == "__main__":
     while True:
