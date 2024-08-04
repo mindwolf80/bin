@@ -327,4 +327,8 @@ def run_script():
     execute_workflow(devices, username, password, secret, use_secret, output_formats, selected_device_type, pause_option, timeout, input_file_name)
 
 if __name__ == "__main__":
-    run_script()
+    while True:
+        run_script()
+        choice = input("Press 'Enter' to run another session or type 'exit' to close the window: ").strip().lower()
+        if choice == 'exit':
+            break
