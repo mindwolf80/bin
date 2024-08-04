@@ -29,6 +29,10 @@ Author: Jason Woringen
 - automtic enable secret for ASA.
 - improved general logging.
 
+6:30 PM 8/4/2024
+- stripped to reduce file size.
+- fixed traceback errors from wrong or 0 input
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.

@@ -213,6 +213,18 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
         if output_formats["txt"]:
             logging.info(f"- {output_file_paths['txt']}")
 
+# Input validation function
+def get_valid_int_input(prompt, min_val=None, max_val=None):
+    while True:
+        try:
+            value = int(input(prompt).strip())
+            if (min_val is not None and value < min_val) or (max_val is not None and value > max_val):
+                print(f"Please enter a number between {min_val} and {max_val}.")
+            else:
+                return value
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
+
 # Main function to run the script
 def run_script():
     global cancel_execution
@@ -223,12 +235,8 @@ def run_script():
     for i, dt in enumerate(Config.DEVICE_TYPES):
         print(f"{i + 1}. {dt}")
 
-    device_type_index = int(input("Select device type (enter number): ")) - 1
-    if device_type_index < 0 or device_type_index >= len(Config.DEVICE_TYPES):
-        print("Invalid selection. Defaulting to linux.")
-        selected_device_type = 'linux'
-    else:
-        selected_device_type = Config.DEVICE_TYPES[device_type_index]
+    device_type_index = get_valid_int_input("Select device type (enter number): ", 1, len(Config.DEVICE_TYPES)) - 1
+    selected_device_type = Config.DEVICE_TYPES[device_type_index]
 
     username = input("Enter Username: ")
     password = input("Enter Password: ")
@@ -285,7 +293,7 @@ def run_script():
         pause_choice = input("Select pause option (enter number): ").strip().lower()
         if pause_choice == '1':
             pause_option = 'timeout'
-            timeout = int(input("Enter timeout between device connections (0-60 seconds): ").strip())
+            timeout = get_valid_int_input("Enter timeout between device connections (0-60 seconds): ", 0, 60)
             break
         elif pause_choice == '2':
             pause_option = 'keypress'
