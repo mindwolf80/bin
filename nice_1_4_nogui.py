@@ -71,6 +71,7 @@ class DeviceConnection:
             print(f"Connected to device {self.device['ip']}.\n")
         except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
             print(f"Failed to connect to device {self.device['ip']}: {e}\n")
+            self.connection = None
         return self.connection
 
     def disconnect(self):
@@ -79,10 +80,19 @@ class DeviceConnection:
 
     def execute_commands(self, commands):
         outputs = []
+        if not self.connection:
+            print(f"Cannot execute commands on device {self.device['ip']} because the connection was not established.")
+            return outputs
+        
         for command in commands:
-            output = self.connection.send_command(command, expect_string=r'[>#]', read_timeout=60)
-            print(f"Output for command '{command}':\n{output}\n")
-            outputs.append(output)
+            try:
+                output = self.connection.send_command_timing(command, read_timeout=60)
+                print(f"Output for command '{command}':\n{output}\n")
+                outputs.append(output)
+            except Exception as e:
+                print(f"Error executing command '{command}' on device {self.device['ip']}: {e}")
+                outputs.append(f"Error executing command '{command}': {e}")
+        
         return outputs
 
 # Output Manager class
