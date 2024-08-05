@@ -33,6 +33,9 @@ Author: Jason Woringen
 - stripped to reduce file size.
 - fixed traceback errors from wrong or 0 input
 
+7:13 PM 8/4/2024
+- fixed traceback errors to create directories if they don't exist
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.
