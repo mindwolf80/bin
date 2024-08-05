@@ -36,6 +36,10 @@ Author: Jason Woringen
 7:13 PM 8/4/2024
 - fixed traceback errors to create directories if they don't exist
 
+10:09 PM 8/4/2024
+- fixed errors attributed to long dns filenames with specials characts and/or spaces
+- add parrallelism as an option for multiple devices. 
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.

@@ -7,6 +7,8 @@ from cryptography.utils import CryptographyDeprecationWarning
 import warnings
 from tqdm import tqdm
 import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -36,6 +38,17 @@ class Config:
 
 def create_directories():
     os.makedirs(os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR), exist_ok=True)
+
+def sanitize_filename(filename, max_length=255):
+    sanitized = re.sub(r'[\/:*?"<>|]', '_', filename)
+    sanitized = sanitized.replace(' ', '_').replace('(', '').replace(')', '')
+    if sanitized != filename:
+        print(f"Note: The DNS name '{filename}' contains special characters or spaces and will be sanitized to '{sanitized}'")
+    return sanitized[:max_length]
+
+def is_valid_ip(ip):
+    pattern = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+    return pattern.match(ip) is not None
 
 class DeviceManager:
     @staticmethod
@@ -99,7 +112,7 @@ class DeviceConnection:
                 output = self.connection.send_command_timing(command, read_timeout=60)
                 outputs.append(output)
             except Exception as e:
-                logging.error(f"Error executing command '{command}' on device {self.device['ip']}: {e}")
+                logging.error(f"Error executing command '{command}' on device {self.device['ip']}]: {e}")
                 outputs.append(f"Error executing command '{command}': {e}")
         
         return outputs
@@ -124,7 +137,7 @@ class OutputManager:
             for output in outputs:
                 file.write(output + "\n")
 
-def display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats):
+def display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats, use_parallel):
     print("\nYou have selected the following options:")
     print(f"Username: {username}")
     print(f"Password: {'*' * len(password)}")
@@ -143,50 +156,67 @@ def display_options(username, password, action_choice, devices, selected_device_
     if pause_option == 'timeout':
         print(f"Timeout: {timeout} seconds")
     print(f"Output Formats: {', '.join([fmt for fmt, selected in output_formats.items() if selected])}")
+    print(f"Parallel Execution: {'Enabled' if use_parallel else 'Disabled'}")
     print("\nPress 1 to run the script or 9 to cancel.")
 
-def execute_workflow(devices, username, password, output_formats, device_type, pause_option, timeout, input_file_name):
+def execute_workflow(devices, username, password, output_formats, device_type, pause_option, timeout, input_file_name, use_parallel=False):
     create_directories()
     all_outputs = []
     any_success = False
 
-    device_progress = tqdm(total=len(devices), desc="Processing devices", position=0, leave=True)
-
-    for (ip, dns), commands in devices.items():
-        if cancel_execution:
-            logging.info("Execution canceled by user.")
-            break
-        
+    def process_device(device_info):
+        (ip, dns), commands = device_info
         device = {
             'device_type': device_type,
             'ip': ip,
             'username': username,
             'password': password,
         }
-        
         if device_type == 'cisco_asa':
             device['secret'] = password
-        
+
         connection = DeviceConnection(device)
         if connection.connect():
             outputs = connection.execute_commands(commands)
             all_outputs.extend([[dns, ip, cmd, out] for cmd, out in zip(commands, outputs)])
             connection.disconnect()
-            any_success = True
+            return ip, dns, True
+        return ip, dns, False
 
-        if pause_option == 'timeout' and timeout > 0:
-            logging.info(f"Pausing for {timeout} seconds...")
-            time.sleep(timeout)
-        elif pause_option == 'keypress':
-            input("Press Enter to continue to the next device...")
+    device_progress = tqdm(total=len(devices), desc="Processing devices", position=0, leave=True)
 
-        device_progress.update(1)
+    if use_parallel and len(devices) > 1:
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(process_device, devices.items()))
+            for ip, dns, success in results:
+                if success:
+                    any_success = True
+                    last_ip = ip
+                    last_dns = dns
+    else:
+        for device_info in devices.items():
+            if cancel_execution:
+                logging.info("Execution canceled by user.")
+                break
+            ip, dns, success = process_device(device_info)
+            if success:
+                any_success = True
+                last_ip = ip
+                last_dns = dns
+            if pause_option == 'timeout' and timeout > 0:
+                logging.info(f"Pausing for {timeout} seconds...")
+                time.sleep(timeout)
+            elif pause_option == 'keypress':
+                input("Press Enter to continue to the next device...")
+
+            device_progress.update(1)
     
     device_progress.close()
 
     if any_success:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        base_name = f"{ip}_{dns}" if input_file_name == "manual_entry" else os.path.splitext(os.path.basename(input_file_name))[0]
+        sanitized_dns = sanitize_filename(last_dns)
+        base_name = f"{last_ip}_{sanitized_dns}" if input_file_name == "manual_entry" else os.path.splitext(os.path.basename(input_file_name))[0]
         output_file_paths = {
             "csv": os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR, f'{base_name}_output_{timestamp}.csv'),
             "xlsx": os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR, f'{base_name}_output_{timestamp}.xlsx'),
@@ -224,7 +254,7 @@ def run_script():
     global cancel_execution
 
     os.system('cls' if os.name == 'nt' else 'clear')  # Clear the screen
-
+        
     print("Available device types:")
     for i, dt in enumerate(Config.DEVICE_TYPES):
         print(f"{i + 1}. {dt}")
@@ -232,8 +262,8 @@ def run_script():
     device_type_index = get_valid_int_input("Select device type (enter number): ", 1, len(Config.DEVICE_TYPES)) - 1
     selected_device_type = Config.DEVICE_TYPES[device_type_index]
 
-    username = input("Enter Username: ")
-    password = input("Enter Password: ")
+    username = input("Enter Username: ").strip()
+    password = input("Enter Password: ").strip()
 
     while True:
         print("Choose action:")
@@ -253,8 +283,16 @@ def run_script():
     devices = {}
     while True:
         if action_choice == 'direct':
-            direct_ip = input("Enter the IP address: ").strip()
+            while True:
+                direct_ip = input("Enter the IP address: ").strip()
+                if is_valid_ip(direct_ip):
+                    print(f"IP address set to: {direct_ip}")
+                    break
+                else:
+                    print("Invalid IP address. Please try again.")
+            
             direct_dns = input("Enter the DNS: ").strip()
+
             print("Enter the commands one by one. Type 'done' when you are finished:")
             commands = []
             while True:
@@ -328,17 +366,15 @@ def run_script():
         if any(output_formats.values()):
             break
 
-    display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats)
+    use_parallel = input("Enable parallel execution for device connections and commands? (yes/no): ").strip().lower() == 'yes'
+
+    display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats, use_parallel)
     user_choice = input().strip()
     if user_choice != '1':
         print("Operation cancelled.")
         return
 
-    execute_workflow(devices, username, password, output_formats, selected_device_type, pause_option, timeout, input_file_name)
+    execute_workflow(devices, username, password, output_formats, selected_device_type, pause_option, timeout, input_file_name, use_parallel)
 
 if __name__ == "__main__":
-    while True:
-        run_script()
-        choice = input("Press 'Enter' to run another session or type 'exit' to close the window: ").strip().lower()
-        if choice == 'exit':
-            break
+    run_script()
