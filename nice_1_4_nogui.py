@@ -8,6 +8,7 @@ import warnings
 from tqdm import tqdm
 import logging
 
+# Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning, module='paramiko')
 warnings.simplefilter("ignore", category=CryptographyDeprecationWarning)
@@ -23,9 +24,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Configuration and utility functions
 class Config:
-    DEVICE_TYPES = ['cisco_asa', 'cisco_ftd', 'cisco_nxos', 'cisco_ios', 'f5_linux', 'f5_tmsh', 'linux', 'paloalto_panos']
+    DEVICE_TYPES = [
+        'cisco_asa', 'cisco_ftd', 'cisco_nxos', 'cisco_ios',
+        'f5_linux', 'f5_tmsh', 'linux', 'paloalto_panos'
+    ]
     OUTPUT_FORMATS = {"csv": True, "xlsx": False, "txt": False}
     REQUIRED_HEADERS = ["ip", "dns", "command"]
     LOG_DIR = 'logs'
@@ -34,7 +37,6 @@ class Config:
 def create_directories():
     os.makedirs(os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR), exist_ok=True)
 
-# Device Manager class
 class DeviceManager:
     @staticmethod
     def check_headers(file_path):
@@ -54,18 +56,16 @@ class DeviceManager:
             raise ValueError("File format is incorrect. Ensure the file contains the required headers: ip, dns, command.")
         
         devices = {}
-        if file_path.endswith('.csv') or file_path.endswith('.xlsx'):
-            df = pd.read_csv(file_path) if file_path.endswith('.csv') else pd.read_excel(file_path, header=0, engine='openpyxl')
-            for _, row in df.iterrows():
-                ip, dns, command = row['ip'], row['dns'], row['command']
-                command_list = command.split('\n')
-                if (ip, dns) in devices:
-                    devices[(ip, dns)].extend(command_list)
-                else:
-                    devices[(ip, dns)] = command_list
+        df = pd.read_csv(file_path) if file_path.endswith('.csv') else pd.read_excel(file_path, engine='openpyxl')
+        for _, row in df.iterrows():
+            ip, dns, command = row['ip'], row['dns'], row['command']
+            command_list = command.split('\n')
+            if (ip, dns) in devices:
+                devices[(ip, dns)].extend(command_list)
+            else:
+                devices[(ip, dns)] = command_list
         return devices
 
-# Device Connection class
 class DeviceConnection:
     def __init__(self, device):
         self.device = device
@@ -76,7 +76,7 @@ class DeviceConnection:
             self.connection = ConnectHandler(**self.device)
             logging.info(f"Connected to device {self.device['ip']}.")
             if self.device['device_type'] == 'cisco_asa':
-                self.connection.enable()  # Use the same password for enable
+                self.connection.enable()
                 logging.info(f"Entered enable mode on {self.device['ip']}.")
         except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
             logging.error(f"Failed to connect to device {self.device['ip']}: {e}")
@@ -97,7 +97,6 @@ class DeviceConnection:
         for command in commands:
             try:
                 output = self.connection.send_command_timing(command, read_timeout=60)
-                # Do not log command outputs to general log
                 outputs.append(output)
             except Exception as e:
                 logging.error(f"Error executing command '{command}' on device {self.device['ip']}: {e}")
@@ -105,25 +104,26 @@ class DeviceConnection:
         
         return outputs
 
-# Output Manager class
 class OutputManager:
     @staticmethod
     def save_output_to_csv(outputs, output_file_path):
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
         df = pd.DataFrame(outputs, columns=["Hostname", "IP", "Command", "Output"])
         df.to_csv(output_file_path, index=False)
 
     @staticmethod
     def save_output_to_xlsx(outputs, output_file_path):
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
         df = pd.DataFrame(outputs, columns=["Hostname", "IP", "Command", "Output"])
         df.to_excel(output_file_path, index=False, engine='openpyxl')
 
     @staticmethod
     def save_output_to_txt(outputs, output_file_path):
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
         with open(output_file_path, 'w') as file:
             for output in outputs:
                 file.write(output + "\n")
 
-# Function to display selected options
 def display_options(username, password, action_choice, devices, selected_device_type, pause_option, timeout, input_file_name, output_formats):
     print("\nYou have selected the following options:")
     print(f"Username: {username}")
@@ -145,7 +145,6 @@ def display_options(username, password, action_choice, devices, selected_device_
     print(f"Output Formats: {', '.join([fmt for fmt, selected in output_formats.items() if selected])}")
     print("\nPress 1 to run the script or 9 to cancel.")
 
-# Function to execute the workflow
 def execute_workflow(devices, username, password, output_formats, device_type, pause_option, timeout, input_file_name):
     create_directories()
     all_outputs = []
@@ -153,7 +152,7 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
 
     device_progress = tqdm(total=len(devices), desc="Processing devices", position=0, leave=True)
 
-    for index, ((ip, dns), commands) in enumerate(devices.items()):
+    for (ip, dns), commands in devices.items():
         if cancel_execution:
             logging.info("Execution canceled by user.")
             break
@@ -166,7 +165,7 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
         }
         
         if device_type == 'cisco_asa':
-            device['secret'] = password  # Automatically use the same password as the enable secret
+            device['secret'] = password
         
         connection = DeviceConnection(device)
         if connection.connect():
@@ -187,10 +186,7 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
 
     if any_success:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        if input_file_name == "manual_entry":
-            base_name = f"{ip}_{dns}"
-        else:
-            base_name = os.path.splitext(os.path.basename(input_file_name))[0]
+        base_name = f"{ip}_{dns}" if input_file_name == "manual_entry" else os.path.splitext(os.path.basename(input_file_name))[0]
         output_file_paths = {
             "csv": os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR, f'{base_name}_output_{timestamp}.csv'),
             "xlsx": os.path.join(Config.LOG_DIR, Config.OUTPUT_SUBDIR, f'{base_name}_output_{timestamp}.xlsx'),
@@ -213,7 +209,6 @@ def execute_workflow(devices, username, password, output_formats, device_type, p
         if output_formats["txt"]:
             logging.info(f"- {output_file_paths['txt']}")
 
-# Input validation function
 def get_valid_int_input(prompt, min_val=None, max_val=None):
     while True:
         try:
@@ -225,7 +220,6 @@ def get_valid_int_input(prompt, min_val=None, max_val=None):
         except ValueError:
             print("Invalid input. Please enter a valid number.")
 
-# Main function to run the script
 def run_script():
     global cancel_execution
 
