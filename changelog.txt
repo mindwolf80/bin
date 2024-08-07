@@ -40,6 +40,16 @@ Author: Jason Woringen
 - fixed errors attributed to long dns filenames with specials characts and/or spaces
 - add parrallelism as an option for multiple devices. 
 
+
+
+v1.5.0 5:26 PM 8/6/2024
+- Improved: User input handling with summary and edit options before execution.
+- Fixed: Issue with send_multiline method by removing it and adjusting output parsing.
+- Updated: Output formatting to consolidate command results for readability.
+- Enhanced: Menu and prompt system for better user experience.
+- Optimized: Parallel execution support for device connections and commands. Very Fast.
+- Adjusted: General log to focus on execution warnings and errors, excluding command outputs.
+
 ---
 
 This changelog reflects the current state of the project and should be updated with future changes, improvements, and fixes as they occur.
