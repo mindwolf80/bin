@@ -54,7 +54,6 @@ class PasswordChangeApp(ttk.Window):
     def __init__(self):
         """Initialize the PasswordChangeApp."""
         super().__init__(themename="darkly")
-
         self.title("Network Device Password Change")
         self.geometry("1280x720")
         self.configure(padx=20, pady=20)
@@ -92,7 +91,7 @@ class PasswordChangeApp(ttk.Window):
         self.treeview = ttk.Treeview(
             self.left_frame,
             yscrollcommand=self.treeview_scroll.set,
-            selectmode="extended",
+            selectmode="extended",  # Allows multiple row selection
         )
         self.treeview_scroll.config(command=self.treeview.yview)
         self.treeview_scroll.pack(side=RIGHT, fill=Y)
@@ -204,6 +203,13 @@ class PasswordChangeApp(ttk.Window):
         )
         self.progress_bar.pack(fill=BOTH, pady=10)
 
+    def toggle_password_visibility(self):
+        """Toggle the visibility of the password entry."""
+        if self.show_password_var.get():
+            self.password_entry.configure(show="")
+        else:
+            self.password_entry.configure(show="*")
+
     def populate_treeview(self, filename):
         """Populate the TreeView with data from the selected CSV file."""
         self.treeview.delete(*self.treeview.get_children())
@@ -212,6 +218,14 @@ class PasswordChangeApp(ttk.Window):
         with open(filename, "r") as csvfile:
             reader = csv.DictReader(csvfile)
             headers = reader.fieldnames
+
+            # Check if headers are None
+            if headers is None:
+                self.log_message("Error: No headers found in the CSV file.")
+                Messagebox.show_error(
+                    "The CSV file appears to be empty or improperly formatted.", "Error"
+                )
+                return
 
             # Configure the TreeView columns dynamically based on the CSV headers
             self.treeview["columns"] = headers
@@ -226,11 +240,6 @@ class PasswordChangeApp(ttk.Window):
                 values = [row[header] for header in headers]
                 self.treeview.insert("", "end", values=values)
 
-        # Select all rows by default
-        self.treeview.selection_set(
-            self.treeview.get_children()
-        )  # Comment: This line selects all rows
-
     def browse_file(self):
         """Open a file dialog to select a CSV file."""
         filename = askopenfilename(filetypes=[("CSV Files", "*.csv")])
@@ -238,13 +247,6 @@ class PasswordChangeApp(ttk.Window):
             self.file_entry.delete(0, END)
             self.file_entry.insert(0, filename)
             self.populate_treeview(filename)
-
-    def toggle_password_visibility(self):
-        """Toggle the visibility of the password entry."""
-        if self.show_password_var.get():
-            self.password_entry.configure(show="")
-        else:
-            self.password_entry.configure(show="*")
 
     def start_password_change(self):
         """Initiate the password change process."""
@@ -358,7 +360,9 @@ class PasswordChangeApp(ttk.Window):
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
-                executor.submit(self.rollback_password, device, username, password)
+                executor.submit(
+                    self.rollback_password_single_device, device, username, password
+                )
                 for device in devices
             ]
             for i, future in enumerate(futures):
@@ -415,22 +419,6 @@ class PasswordChangeApp(ttk.Window):
 
         except Exception as e:
             self.log_message(f"Error changing password for {device['ip']}: {str(e)}")
-
-    def verify_new_password(self, device, username, new_password):
-        """Verify the new password by attempting to connect."""
-        for i in range(2):
-            try:
-                test_connection = self.connect_to_device(device, username, new_password)
-                self.log_message(
-                    f"Verification login {i+1} successful for {device['ip']}"
-                )
-                test_connection.disconnect()
-            except Exception as e:
-                self.log_message(
-                    f"Verification login {i+1} failed for {device['ip']}: {str(e)}"
-                )
-                return False
-        return True
 
     def rollback_password_single_device(self, device, username, password):
         """Rollback the password change for a single device."""
