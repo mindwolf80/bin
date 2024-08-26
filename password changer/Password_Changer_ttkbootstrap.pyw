@@ -1,5 +1,3 @@
-"""Network Device Password Change Application using ttkbootstrap."""
-
 import csv
 import logging
 import os
@@ -9,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import BOTH, LEFT, RIGHT, END, DISABLED, NORMAL, Y
+from ttkbootstrap.constants import BOTH, LEFT, RIGHT, END, DISABLED, NORMAL, Y, CENTER
 from ttkbootstrap.dialogs import Messagebox
 from tkinter.filedialog import askopenfilename
 from cryptography.utils import CryptographyDeprecationWarning
@@ -58,8 +56,11 @@ class PasswordChangeApp(ttk.Window):
         super().__init__(themename="darkly")
 
         self.title("Network Device Password Change")
-        self.geometry("800x800")
+        self.geometry("1280x720")
         self.configure(padx=20, pady=20)
+
+        # Make the app start maximized
+        self.state("zoomed")
 
         self.create_widgets()
         self.stop_flag = threading.Event()
@@ -75,8 +76,41 @@ class PasswordChangeApp(ttk.Window):
 
     def create_widgets(self):
         """Create and arrange the GUI widgets."""
+        # Main container
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(fill=BOTH, expand=True)
+
+        # Left side container
+        self.left_frame = ttk.Frame(self.main_frame)
+        self.left_frame.pack(side=LEFT, fill=BOTH, padx=(0, 10), expand=True)
+
+        # TreeView with Scrollbar
+        self.treeview_label = ttk.Label(self.left_frame, text="Devices:")
+        self.treeview_label.pack(pady=(0, 5))
+
+        self.treeview_scroll = ttk.Scrollbar(self.left_frame, orient="vertical")
+        self.treeview = ttk.Treeview(
+            self.left_frame,
+            yscrollcommand=self.treeview_scroll.set,
+            selectmode="extended",
+        )
+        self.treeview_scroll.config(command=self.treeview.yview)
+        self.treeview_scroll.pack(side=RIGHT, fill=Y)
+        self.treeview.pack(fill=BOTH, expand=True)
+
+        # Hide the ghost column
+        self.treeview.column("#0", width=0, stretch=False)
+
+        # Separator
+        self.separator = ttk.Separator(self.main_frame, orient="vertical")
+        self.separator.pack(side=LEFT, fill=Y, padx=10)
+
+        # Right side container
+        self.right_frame = ttk.Frame(self.main_frame)
+        self.right_frame.pack(side=RIGHT, fill=BOTH, expand=True)
+
         # File selection
-        self.file_frame = ttk.Frame(self)
+        self.file_frame = ttk.Frame(self.right_frame)
         self.file_frame.pack(fill=BOTH, pady=10)
 
         self.file_label = ttk.Label(self.file_frame, text="CSV File:")
@@ -91,7 +125,7 @@ class PasswordChangeApp(ttk.Window):
         self.file_button.pack(side=LEFT)
 
         # Username input
-        self.username_frame = ttk.Frame(self)
+        self.username_frame = ttk.Frame(self.right_frame)
         self.username_frame.pack(fill=BOTH, pady=10)
 
         self.username_label = ttk.Label(self.username_frame, text="Username:")
@@ -101,7 +135,7 @@ class PasswordChangeApp(ttk.Window):
         self.username_entry.pack(side=LEFT, padx=5)
 
         # Password input
-        self.password_frame = ttk.Frame(self)
+        self.password_frame = ttk.Frame(self.right_frame)
         self.password_frame.pack(fill=BOTH, pady=10)
 
         self.password_label = ttk.Label(self.password_frame, text="Password:")
@@ -120,7 +154,7 @@ class PasswordChangeApp(ttk.Window):
         self.show_password_check.pack(side=LEFT)
 
         # Log display
-        self.log_frame = ttk.Frame(self)
+        self.log_frame = ttk.Frame(self.right_frame)
         self.log_frame.pack(fill=BOTH, expand=True, pady=10)
 
         self.log_label = ttk.Label(self.log_frame, text="Logs:")
@@ -137,7 +171,7 @@ class PasswordChangeApp(ttk.Window):
         self.log_text.configure(yscrollcommand=self.log_scrollbar.set)
 
         # Control buttons
-        self.button_frame = ttk.Frame(self)
+        self.button_frame = ttk.Frame(self.right_frame)
         self.button_frame.pack(fill=BOTH, pady=10)
 
         self.start_button = ttk.Button(
@@ -166,9 +200,36 @@ class PasswordChangeApp(ttk.Window):
         # Progress bar
         self.progress_var = ttk.DoubleVar()
         self.progress_bar = ttk.Progressbar(
-            self, variable=self.progress_var, maximum=100
+            self.right_frame, variable=self.progress_var, maximum=100
         )
         self.progress_bar.pack(fill=BOTH, pady=10)
+
+    def populate_treeview(self, filename):
+        """Populate the TreeView with data from the selected CSV file."""
+        self.treeview.delete(*self.treeview.get_children())
+
+        # Open the CSV file and read the headers
+        with open(filename, "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            headers = reader.fieldnames
+
+            # Configure the TreeView columns dynamically based on the CSV headers
+            self.treeview["columns"] = headers
+
+            # Set up the headers and configure the columns
+            for header in headers:
+                self.treeview.heading(header, text=header, anchor=CENTER)
+                self.treeview.column(header, anchor=CENTER, stretch=True)
+
+            # Insert data into the TreeView
+            for row in reader:
+                values = [row[header] for header in headers]
+                self.treeview.insert("", "end", values=values)
+
+        # Select all rows by default
+        self.treeview.selection_set(
+            self.treeview.get_children()
+        )  # Comment: This line selects all rows
 
     def browse_file(self):
         """Open a file dialog to select a CSV file."""
@@ -176,6 +237,7 @@ class PasswordChangeApp(ttk.Window):
         if filename:
             self.file_entry.delete(0, END)
             self.file_entry.insert(0, filename)
+            self.populate_treeview(filename)
 
     def toggle_password_visibility(self):
         """Toggle the visibility of the password entry."""
@@ -186,6 +248,11 @@ class PasswordChangeApp(ttk.Window):
 
     def start_password_change(self):
         """Initiate the password change process."""
+        selected_items = self.treeview.selection()
+        if not selected_items:
+            Messagebox.show_error("Please select devices from the list.", "Error")
+            return
+
         csv_file = self.file_entry.get()
         username = self.username_entry.get()
         password = self.password_entry.get()
@@ -200,8 +267,16 @@ class PasswordChangeApp(ttk.Window):
         self.progress_var.set(0)
         self.stop_flag.clear()
 
+        selected_devices = []
+        with open(csv_file, "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            device_dict = {row["ip"]: row for row in reader}
+            for item in selected_items:
+                ip = self.treeview.item(item, "values")[0]
+                selected_devices.append(device_dict[ip])
+
         self.password_change_thread = threading.Thread(
-            target=self.run_password_change, args=(csv_file, username, password)
+            target=self.run_password_change, args=(selected_devices, username, password)
         )
         self.password_change_thread.start()
 
@@ -215,6 +290,11 @@ class PasswordChangeApp(ttk.Window):
 
     def rollback_passwords(self):
         """Initiate the password rollback process."""
+        selected_items = self.treeview.selection()
+        if not selected_items:
+            Messagebox.show_error("Please select devices from the list.", "Error")
+            return
+
         csv_file = self.file_entry.get()
         username = self.username_entry.get()
         password = self.password_entry.get()
@@ -232,14 +312,21 @@ class PasswordChangeApp(ttk.Window):
             self.progress_var.set(0)
             self.stop_flag.clear()
 
+            selected_devices = []
+            with open(csv_file, "r") as csvfile:
+                reader = csv.DictReader(csvfile)
+                device_dict = {row["ip"]: row for row in reader}
+                for item in selected_items:
+                    ip = self.treeview.item(item, "values")[0]
+                    selected_devices.append(device_dict[ip])
+
             self.rollback_thread = threading.Thread(
-                target=self.run_rollback, args=(csv_file, username, password)
+                target=self.run_rollback, args=(selected_devices, username, password)
             )
             self.rollback_thread.start()
 
-    def run_password_change(self, csv_file, username, password):
-        """Execute the password change process for all devices."""
-        devices = self.read_device_list(csv_file)
+    def run_password_change(self, devices, username, password):
+        """Execute the password change process for selected devices."""
         total_devices = len(devices)
 
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -265,9 +352,8 @@ class PasswordChangeApp(ttk.Window):
         self.stop_button.configure(state=DISABLED)
         self.rollback_button.configure(state=NORMAL)
 
-    def run_rollback(self, csv_file, username, password):
-        """Execute the password rollback process for all devices."""
-        devices = self.read_device_list(csv_file)
+    def run_rollback(self, devices, username, password):
+        """Execute the password rollback process for selected devices."""
         total_devices = len(devices)
 
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -290,17 +376,6 @@ class PasswordChangeApp(ttk.Window):
         self.start_button.configure(state=NORMAL)
         self.stop_button.configure(state=DISABLED)
         self.rollback_button.configure(state=NORMAL)
-
-    def read_device_list(self, file_path):
-        """Read the list of devices from a CSV file."""
-        devices = []
-        with open(file_path, "r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Skip lines that start with '#'
-                if not row["ip"].strip().startswith("#"):
-                    devices.append(row)
-        return devices
 
     def change_password(self, device, username, password):
         """Change the password for a single device."""
