@@ -1,0 +1,88 @@
++------------------------+
+|    Start Script        |
++------------------------+
+           |
+           v
++------------------------+
+| User inputs credentials|
+| - Username             |
+| - Password             |
++------------------------+
+           |
+           v
++------------------------+
+| User selects or inputs |
+| device information     |
+| - Device list file     |
+| - Manual entry         |
++------------------------+
+           |
+           v
++------------------------+
+| User configures        |
+| execution settings     |
+| - Device type          |
+| - Output formats       |
+| - Parallel execution   |
+| - Pause between devices|
+| - Timeout duration     |
++------------------------+
+           |
+           v
++------------------------+
+| Script starts          |
+| execution              |
++------------------------+
+           |
+           v
++------------------------+
+| For each device:       |
+|                        |
+| +--------------------+ |
+| | Connecting...      | |
+| +--------------------+ |
+|          |             |
+|          v             |
+| +--------------------+ |
+| | Executing commands | |
+| | - Command 1...     | |
+| | - Command 2...     | |
+| | ...                | |
+| +--------------------+ |
+|          |             |
+|          v             |
+| +--------------------+ |
+| | Disconnecting...   | |
+| +--------------------+ |
+|                        |
+| (User can press 'q'    |
+|  to cancel at any time)|
++------------------------+
+           |
+           v
++------------------------+
+| Execution complete     |
+| - Display results      |
+| - Show output locations|
++------------------------+
+           |
+           v
++------------------------+
+| User options:          |
+| 1. View logs           |
+| 2. Execute again       |
+| 3. Exit                |
++------------------------+
+           |
+           v
++------------------------+
+|    End Script          |
++------------------------+
+
+Notes:
+- At any point, user can press 'q' to forcefully cancel all operations
+- Progress updates are shown in real-time
+- Error messages are displayed if connection or command execution fails
+- Parallel execution will process multiple devices simultaneously
+- If pause between devices is enabled, user is prompted to continue after each device
+- Timeout duration (if set) is applied between devices
