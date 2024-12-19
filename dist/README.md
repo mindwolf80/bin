@@ -1,4 +1,3 @@
-Here’s a nicely formatted version of your readme content, tailored for a GitHub repository:
 
 ---
 
@@ -185,4 +184,3 @@ By increasing `max_workers`, you can allow more threads to run concurrently. How
 
 ---
 
-Let me know if you'd like any further adjustments! 🚀
