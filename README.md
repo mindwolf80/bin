@@ -25,7 +25,7 @@
    ```
 
 3. **Build the Executable**:
-   Follow the instructions in the [How to Build and Run](docs/HowToBuildAndRun.md) guide.
+   Follow the instructions in the [How to Build and Run](dist/HowToBuildAndRun.md) guide.
 
 ---
 
