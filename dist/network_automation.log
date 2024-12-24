@@ -14,3 +14,8 @@
 2024-12-18 18:26:36,498 - INFO - Executing 'ifconfig' on 192.168.1.1
 2024-12-18 18:26:37,020 - INFO - Disconnected from 192.168.1.1
 2024-12-18 18:26:37,020 - INFO - All tasks completed. Check the 'results' directory, CSV file, and 'network_automation.log' for details.
+2024-12-24 17:46:03,617 - INFO - Text file generation is disabled.
+2024-12-24 17:46:03,626 - INFO - Text file generation is disabled.
+2024-12-24 17:54:18,099 - INFO - Text file generation is disabled.
+2024-12-24 17:54:18,108 - INFO - Text file generation is disabled.
+2024-12-24 17:54:18,116 - INFO - Text file generation is disabled.
