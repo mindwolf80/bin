@@ -85,6 +85,11 @@ def load_config(file_path):
             with open(netmiko_log_path, "w") as log_file:
                 log_file.write("Netmiko log content")
 
+            # Check if pause after command is enabled
+            pause_after_command = config.get("pause_after_command", False)
+            if pause_after_command:
+                logger.info("Pausing after each command is enabled.")
+
             return config
     except FileNotFoundError:
         logger.error(f"Configuration file '{file_path}' not found.")
