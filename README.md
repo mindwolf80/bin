@@ -1,6 +1,6 @@
 # CommandMate
 
-**CommandMate** is a Python-based automation tool for managing network devices. It allows you to execute commands on multiple devices simultaneously, making it ideal for configuration management, command execution, and more.
+**CommandMate** is a Python-based command line automation tool for managing network devices. It allows you to execute commands on multiple devices simultaneously, making it ideal for configuration management, command execution, and more.
 
 ---
 
