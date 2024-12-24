@@ -56,7 +56,7 @@ def load_config(file_path):
         SystemExit: If the file is not found or there is a YAML parsing error.
     """
     try:
-        with open(file_path, "r") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
 
             # Ensure the 'results' directory exists
@@ -67,14 +67,19 @@ def load_config(file_path):
             generate_txt_files = config.get("generate_txt_files", False)
             if generate_txt_files:
                 logger.info("Text file generation is enabled.")
-                with open(os.path.join(results_dir, "output.txt"), "w") as txt_file:
+                with open(
+                    os.path.join(results_dir, "output.txt"), "w", encoding="utf-8"
+                ) as txt_file:
                     txt_file.write("Sample content")
             else:
                 logger.info("Text file generation is disabled.")
 
             # Always generate CSV and netmiko_log files
             with open(
-                os.path.join(results_dir, "output.csv"), "w", newline=""
+                os.path.join(results_dir, "output.csv"),
+                "w",
+                newline="",
+                encoding="utf-8",
             ) as csv_file:
                 writer = csv.writer(csv_file)
                 writer.writerow(["Header1", "Header2"])
@@ -82,7 +87,7 @@ def load_config(file_path):
 
             # Example of handling netmiko_log
             netmiko_log_path = os.path.join(results_dir, "netmiko_log.log")
-            with open(netmiko_log_path, "w") as log_file:
+            with open(netmiko_log_path, "w", encoding="utf-8") as log_file:
                 log_file.write("Netmiko log content")
 
             # Check if pause after command is enabled
