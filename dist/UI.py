@@ -19,6 +19,10 @@ def main_menu(stdscr):
     def print_menu(stdscr, selected_row_idx):
         stdscr.clear()
         h, w = stdscr.getmaxyx()
+        title = "Network Automation Tool"
+        stdscr.attron(curses.color_pair(2))
+        stdscr.addstr(1, w // 2 - len(title) // 2, title)
+        stdscr.attroff(curses.color_pair(2))
         for idx, row in enumerate(menu):
             x = w // 2 - len(row) // 2
             y = h // 2 - len(menu) // 2 + idx
@@ -28,6 +32,7 @@ def main_menu(stdscr):
                 stdscr.attroff(curses.color_pair(1))
             else:
                 stdscr.addstr(y, x, row)
+        stdscr.addstr(h - 2, 0, "Use arrow keys to navigate and ENTER to select.")
         stdscr.refresh()
 
     # Function to show a confirmation prompt
@@ -47,13 +52,17 @@ def main_menu(stdscr):
         stdscr.clear()
         stdscr.addstr(0, 0, "Previewing hosts from config.yaml:\n")
         stdscr.refresh()
-        display_hosts(hosts_config)  # Use the display_hosts function
+        try:
+            display_hosts(hosts_config)  # Use the display_hosts function
+        except Exception as e:
+            stdscr.addstr(2, 0, f"Error displaying hosts: {e}")
         stdscr.addstr("\nPress any key to return to the menu.")
         stdscr.refresh()
         stdscr.getch()
 
     # Initialize colors
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
+    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
 
     # Print the initial menu
     print_menu(stdscr, current_row)
@@ -83,9 +92,12 @@ def main_menu(stdscr):
                 stdscr.clear()
                 stdscr.addstr(0, 0, "Running main app...")
                 stdscr.refresh()
-                main()  # Directly call the main function from main.py
+                try:
+                    main()  # Directly call the main function from main.py
+                except Exception as e:
+                    stdscr.addstr(2, 0, f"Error running main app: {e}")
                 stdscr.addstr(
-                    2,
+                    4,
                     0,
                     "Main app execution completed. Press any key to return to the menu.",
                 )
