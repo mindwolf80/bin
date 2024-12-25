@@ -2,7 +2,7 @@ import curses
 import subprocess
 import platform
 import socket
-from main import load_config  # Import necessary functions
+from main import load_config, display_hosts  # Import necessary functions
 
 
 def main_menu(stdscr):
@@ -27,11 +27,7 @@ def main_menu(stdscr):
         "Preview Hosts",
         "Run Main App",
         "Test Connectivity",
-        "Execute Commands for Specific Hosts",
-        "Execute Group-Specific Commands",
-        "View Groups and Associated Commands",
-        "View Logs",
-        "Reload Configuration",
+        "View Groups and Commands",
         "Exit",
     ]
     current_row = 0
@@ -63,18 +59,8 @@ def main_menu(stdscr):
         if not hosts_config:
             stdscr.addstr(2, 0, "No hosts configured.")
         else:
-            row = 2  # Start after the header
-            for idx, host in enumerate(hosts_config, start=1):
-                hostname = host.get("hostname", "N/A")
-                device_type = host.get("device_type", "N/A")
-                groups = (
-                    ", ".join(host.get("groups", [])) if host.get("groups") else "None"
-                )
-                stdscr.addstr(row, 0, f"{idx}. Hostname: {hostname}")
-                stdscr.addstr(row + 1, 0, f"   Device Type: {device_type}")
-                stdscr.addstr(row + 2, 0, f"   Groups: {groups}")
-                row += 4  # Add spacing between entries
-        stdscr.addstr(row, 0, "Press any key to return to the menu.")
+            display_hosts(hosts_config)
+        stdscr.addstr("\nPress any key to return to the menu.")
         stdscr.refresh()
         stdscr.getch()
 
@@ -128,7 +114,7 @@ def main_menu(stdscr):
         for host in hosts_config:
             hostname = host.get("hostname", "N/A")
             if hostname == "N/A":
-                stdscr.addstr(row, 0, f"Host entry missing hostname.")
+                stdscr.addstr(row, 0, "Host entry missing hostname.")
                 row += 1
                 continue
 
@@ -172,6 +158,23 @@ def main_menu(stdscr):
             row += 1
         return row
 
+    # Function to view groups and associated commands
+    def view_groups_and_commands(stdscr):
+        stdscr.clear()
+        stdscr.addstr(0, 0, "Groups and Associated Commands:\n")
+        row = 2
+        if not groups_config:
+            stdscr.addstr(row, 0, "No groups configured.")
+        else:
+            for group, details in groups_config.items():
+                commands = details.get("commands", [])
+                stdscr.addstr(row, 0, f"Group: {group}")
+                stdscr.addstr(row + 1, 0, f"Commands: {', '.join(commands)}")
+                row += 3  # Add spacing between groups
+        stdscr.addstr(row, 0, "Press any key to return to the menu.")
+        stdscr.refresh()
+        stdscr.getch()
+
     # Initialize colors
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
@@ -194,6 +197,8 @@ def main_menu(stdscr):
                 run_main_app(stdscr)
             elif current_row == 2:
                 test_connectivity(stdscr)
+            elif current_row == 3:
+                view_groups_and_commands(stdscr)
 
         print_menu(stdscr, current_row)
 
