@@ -73,19 +73,31 @@ def main_menu(stdscr):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            bufsize=1,
         )
 
         # Display output in real-time
+        output_lines = []
         while True:
             output = process.stdout.readline()
-            if output == "" and process.poll() is not None:
+            error = process.stderr.readline()
+            if output == "" and error == "" and process.poll() is not None:
                 break
             if output:
-                stdscr.addstr(output)
-                stdscr.refresh()
+                output_lines.append(output.strip())
+            if error:
+                output_lines.append(f"ERROR: {error.strip()}")
+
+            # Display the last few lines of output
+            stdscr.clear()
+            for idx, line in enumerate(output_lines[-(stdscr.getmaxyx()[0] - 2) :]):
+                stdscr.addstr(idx, 0, line)
+            stdscr.refresh()
 
         stdscr.addstr(
-            "\nMain app execution completed. Press any key to return to the menu."
+            stdscr.getmaxyx()[0] - 1,
+            0,
+            "Main app execution completed. Press any key to return to the menu.",
         )
         stdscr.refresh()
         stdscr.getch()
@@ -110,7 +122,7 @@ def main_menu(stdscr):
 
             action = menu[current_row]
 
-            if not skip_prompts:
+            if current_row == 1 and not skip_prompts:
                 if not confirm_action(stdscr, action):
                     continue
 
