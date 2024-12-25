@@ -1,9 +1,9 @@
 import os
-import yaml
 import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
+import yaml
 import threading
 from rich.console import Console
 from rich.table import Table
