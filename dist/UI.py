@@ -1,8 +1,6 @@
-# ui.py
-
 import curses
-import os
-from main import load_config, display_hosts  # Import necessary functions from main
+from main import load_config, display_hosts, main  # Import necessary functions
+
 
 def main_menu(stdscr):
     # Clear screen
@@ -39,9 +37,9 @@ def main_menu(stdscr):
         stdscr.refresh()
         while True:
             key = stdscr.getch()
-            if key in [ord('y'), ord('Y')]:
+            if key in [ord("y"), ord("Y")]:
                 return True
-            elif key in [ord('n'), ord('N')]:
+            elif key in [ord("n"), ord("N")]:
                 return False
 
     # Function to preview hosts
@@ -89,10 +87,15 @@ def main_menu(stdscr):
                 stdscr.clear()
                 stdscr.addstr(0, 0, "Running main app...")
                 stdscr.refresh()
-                os.system("python main.py")
-                stdscr.addstr(2, 0, "Main app execution completed. Press any key to return to the menu.")
+                main()  # Directly call the main function from main.py
+                stdscr.addstr(
+                    2,
+                    0,
+                    "Main app execution completed. Press any key to return to the menu.",
+                )
                 stdscr.getch()
 
         print_menu(stdscr, current_row)
+
 
 curses.wrapper(main_menu)
