@@ -23,7 +23,7 @@ fh.setLevel(logging.INFO)
 
 # Console handler setup
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
+ch.setLevel(logging.INFO)
 
 # Formatter setup
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
