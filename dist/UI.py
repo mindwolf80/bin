@@ -1,74 +1,75 @@
-import curses
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer, Button, Static, TextLog
+from textual.containers import Container
+from textual.reactive import reactive
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
 import subprocess
 import platform
 import socket
-from main import load_config, display_hosts  # Import necessary functions
+from dist.main import load_config, display_hosts
+
+console = Console()
 
 
-def main_menu(stdscr):
-    # Load configuration
-    def load_configuration():
-        try:
-            return load_config("config.yaml")
-        except Exception as e:
-            stdscr.addstr(0, 0, f"Error loading configuration: {e}")
-            stdscr.refresh()
-            stdscr.getch()
-            return None
+class NetworkAutomationApp(App):
+    CSS_PATH = "styles.css"  # Optional: Path to a CSS file for styling
 
-    config = load_configuration()
-    if config is None:
-        return
-    hosts_config = config.get("hosts", [])
-    groups_config = config.get("groups", {})
+    def __init__(self):
+        super().__init__()
+        self.config = load_config("config.yaml")
+        self.hosts_config = self.config.get("hosts", [])
+        self.groups_config = self.config.get("groups", {})
+        self.output_log = reactive("")
 
-    # Set up the menu
-    menu = [
-        "Preview Hosts",
-        "Run Main App",
-        "Test Connectivity",
-        "View Groups and Commands",
-        "Exit",
-    ]
-    current_row = 0
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Footer()
+        yield Container(
+            Static("Network Automation Tool", classes="title"),
+            Button("Preview Hosts", id="preview_hosts"),
+            Button("Run Main App", id="run_main_app"),
+            Button("Test Connectivity", id="test_connectivity"),
+            Button("View Groups and Commands", id="view_groups"),
+            Button("Exit", id="exit"),
+            TextLog(self.output_log, classes="output"),
+        )
 
-    # Function to print the menu
-    def print_menu(stdscr, selected_row_idx):
-        stdscr.clear()
-        h, w = stdscr.getmaxyx()
-        title = "Network Automation Tool"
-        stdscr.attron(curses.color_pair(2))
-        stdscr.addstr(1, w // 2 - len(title) // 2, title)
-        stdscr.attroff(curses.color_pair(2))
-        for idx, row in enumerate(menu):
-            x = w // 2 - len(row) // 2
-            y = h // 2 - len(menu) // 2 + idx
-            if idx == selected_row_idx:
-                stdscr.attron(curses.color_pair(1))
-                stdscr.addstr(y, x, row)
-                stdscr.attroff(curses.color_pair(1))
-            else:
-                stdscr.addstr(y, x, row)
-        stdscr.addstr(h - 2, 0, "Use arrow keys to navigate and ENTER to select.")
-        stdscr.refresh()
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        button_id = event.button.id
+        if button_id == "preview_hosts":
+            self.preview_hosts()
+        elif button_id == "run_main_app":
+            self.run_main_app()
+        elif button_id == "test_connectivity":
+            self.test_connectivity()
+        elif button_id == "view_groups":
+            self.view_groups_and_commands()
+        elif button_id == "exit":
+            self.exit()
 
-    # Function to preview hosts
-    def preview_hosts(stdscr):
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Previewing hosts from config.yaml:\n")
-        if not hosts_config:
-            stdscr.addstr(2, 0, "No hosts configured.")
+    def preview_hosts(self):
+        self.output_log = "Previewing hosts from config.yaml:\n"
+        if not self.hosts_config:
+            self.output_log += "No hosts configured."
         else:
-            display_hosts(hosts_config)
-        stdscr.addstr("\nPress any key to return to the menu.")
-        stdscr.refresh()
-        stdscr.getch()
+            table = Table(
+                title="Available Devices", show_header=True, header_style="bold cyan"
+            )
+            table.add_column("No.", style="dim", width=6)
+            table.add_column("Hostname", style="bold")
+            table.add_column("Device Type", style="green")
+            table.add_column("Groups", style="magenta")
 
-    # Function to run main app
-    def run_main_app(stdscr):
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Running main app...\n")
-        stdscr.refresh()
+            for idx, host in enumerate(self.hosts_config, start=1):
+                groups = ", ".join(host.get("groups", []))
+                table.add_row(str(idx), host["hostname"], host["device_type"], groups)
+
+            self.output_log += console.render_str(table)
+
+    def run_main_app(self):
+        self.output_log = "Running main app...\n"
         try:
             process = subprocess.Popen(
                 ["python", "dist/main.py"],
@@ -77,48 +78,25 @@ def main_menu(stdscr):
                 text=True,
                 bufsize=1,
             )
-            output_lines = []
-            while True:
-                output = process.stdout.readline()
-                error = process.stderr.readline()
-                if output == "" and error == "" and process.poll() is not None:
-                    break
-                if output:
-                    output_lines.append(output.strip())
-                if error:
-                    output_lines.append(f"ERROR: {error.strip()}")
+            for line in process.stdout:
+                self.output_log += line.strip() + "\n"
+            for line in process.stderr:
+                self.output_log += f"ERROR: {line.strip()}\n"
 
-                stdscr.clear()
-                for idx, line in enumerate(output_lines[-(stdscr.getmaxyx()[0] - 2) :]):
-                    stdscr.addstr(idx, 0, line)
-                stdscr.refresh()
-
-            stdscr.addstr(
-                stdscr.getmaxyx()[0] - 1,
-                0,
-                "Main app execution completed. Press any key to return to the menu.",
-            )
+            self.output_log += "\nMain app execution completed."
         except Exception as e:
-            stdscr.addstr(2, 0, f"Error running main app: {e}")
-        finally:
-            stdscr.refresh()
-            stdscr.getch()
+            self.output_log += f"Error running main app: {e}"
 
-    # Function to test connectivity
-    def test_connectivity(stdscr):
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Testing connectivity to hosts:\n")
-        row = 2
+    def test_connectivity(self):
+        self.output_log = "Testing connectivity to hosts:\n"
         ping_flag = "-n" if platform.system().lower() == "windows" else "-c"
 
-        for host in hosts_config:
+        for host in self.hosts_config:
             hostname = host.get("hostname", "N/A")
             if hostname == "N/A":
-                stdscr.addstr(row, 0, "Host entry missing hostname.")
-                row += 1
+                self.output_log += "Host entry missing hostname.\n"
                 continue
 
-            # Initial ping test
             try:
                 result = subprocess.run(
                     ["ping", ping_flag, "1", hostname],
@@ -127,80 +105,37 @@ def main_menu(stdscr):
                     text=True,
                 )
                 if result.returncode == 0:
-                    stdscr.addstr(row, 0, f"{hostname}: Reachable via ping")
+                    self.output_log += f"{hostname}: Reachable via ping\n"
                 else:
-                    stdscr.addstr(
-                        row, 0, f"{hostname}: Unreachable via ping, testing ports..."
+                    self.output_log += (
+                        f"{hostname}: Unreachable via ping, testing ports...\n"
                     )
-                    row += 1
-                    # Fall back to port testing
-                    row = test_ports(stdscr, hostname, row)
+                    self.test_ports(hostname)
             except Exception as e:
-                stdscr.addstr(row, 0, f"{hostname}: Error - {e}")
-            row += 2  # Add spacing between hosts
+                self.output_log += f"{hostname}: Error - {e}\n"
 
-        stdscr.addstr(row, 0, "Press any key to return to the menu.")
-        stdscr.refresh()
-        stdscr.getch()
-
-    # Function to test specific ports if ping fails
-    def test_ports(stdscr, hostname, row):
+    def test_ports(self, hostname):
         ports = [22, 80, 443]
         for port in ports:
             try:
                 sock = socket.create_connection((hostname, port), timeout=2)
-                stdscr.addstr(row, 0, f"   Port {port}: Open")
+                self.output_log += f"   Port {port}: Open\n"
                 sock.close()
             except socket.timeout:
-                stdscr.addstr(row, 0, f"   Port {port}: Timed out")
+                self.output_log += f"   Port {port}: Timed out\n"
             except socket.error as e:
-                stdscr.addstr(row, 0, f"   Port {port}: Closed - {e}")
-            row += 1
-        return row
+                self.output_log += f"   Port {port}: Closed - {e}\n"
 
-    # Function to view groups and associated commands
-    def view_groups_and_commands(stdscr):
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Groups and Associated Commands:\n")
-        row = 2
-        if not groups_config:
-            stdscr.addstr(row, 0, "No groups configured.")
+    def view_groups_and_commands(self):
+        self.output_log = "Groups and Associated Commands:\n"
+        if not self.groups_config:
+            self.output_log += "No groups configured."
         else:
-            for group, details in groups_config.items():
+            for group, details in self.groups_config.items():
                 commands = details.get("commands", [])
-                stdscr.addstr(row, 0, f"Group: {group}")
-                stdscr.addstr(row + 1, 0, f"Commands: {', '.join(commands)}")
-                row += 3  # Add spacing between groups
-        stdscr.addstr(row, 0, "Press any key to return to the menu.")
-        stdscr.refresh()
-        stdscr.getch()
-
-    # Initialize colors
-    curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
-    curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
-
-    # Main loop
-    print_menu(stdscr, current_row)
-    while True:
-        key = stdscr.getch()
-        if key == curses.KEY_UP and current_row > 0:
-            current_row -= 1
-        elif key == curses.KEY_DOWN and current_row < len(menu) - 1:
-            current_row += 1
-        elif key == curses.KEY_ENTER or key in [10, 13]:
-            if current_row == len(menu) - 1:
-                break  # Exit the program
-
-            if current_row == 0:
-                preview_hosts(stdscr)
-            elif current_row == 1:
-                run_main_app(stdscr)
-            elif current_row == 2:
-                test_connectivity(stdscr)
-            elif current_row == 3:
-                view_groups_and_commands(stdscr)
-
-        print_menu(stdscr, current_row)
+                self.output_log += f"Group: {group}\nCommands: {', '.join(commands)}\n"
 
 
-curses.wrapper(main_menu)
+if __name__ == "__main__":
+    app = NetworkAutomationApp()
+    app.run()
