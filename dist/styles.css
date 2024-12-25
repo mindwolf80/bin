@@ -1,0 +1,39 @@
+/* General App Styling */
+* {
+    background: black; /* Background color */
+    color: white;      /* Text color */
+}
+
+/* Header Styling */
+Header {
+    background: #282c34;
+    color: cyan;
+    text-align: center;
+    padding: 1; /* Single integer for padding */
+}
+
+/* Footer Styling */
+Footer {
+    background: #282c34;
+    color: cyan;
+    text-align: center;
+    padding: 1;
+}
+
+/* Button Styling */
+Button {
+    border: solid cyan; /* Use a valid border type and color */
+    background: #333333;
+    color: cyan;
+    padding: 1 2; /* Vertical and horizontal padding */
+    margin: 1;    /* Single integer for margin */
+}
+
+/* Log Widget Styling */
+Log {
+    background: #20232a;
+    color: lightgreen;
+    border: dashed green; /* Valid border type and color */
+    padding: 1;           /* Single integer for padding */
+    margin: 1;            /* Single integer for margin */
+}
