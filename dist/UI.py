@@ -42,17 +42,13 @@ def main_menu(stdscr):
             elif key in [ord("n"), ord("N")]:
                 return False
 
-    # Function to preview hosts
+    # Function to preview hosts using display_hosts
     def preview_hosts(stdscr):
         stdscr.clear()
         stdscr.addstr(0, 0, "Previewing hosts from config.yaml:\n")
-        y = 2
-        for idx, host in enumerate(hosts_config, start=1):
-            stdscr.addstr(y, 0, f"{idx}. Hostname: {host.get('hostname', 'N/A')}")
-            stdscr.addstr(y + 1, 0, f"   Device Type: {host.get('device_type', 'N/A')}")
-            stdscr.addstr(y + 2, 0, f"   Groups: {', '.join(host.get('groups', []))}")
-            y += 4
-        stdscr.addstr(y, 0, "Press any key to return to the menu.")
+        stdscr.refresh()
+        display_hosts(hosts_config)  # Use the display_hosts function
+        stdscr.addstr("\nPress any key to return to the menu.")
         stdscr.refresh()
         stdscr.getch()
 
