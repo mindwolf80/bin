@@ -4,11 +4,10 @@ from textual.containers import Container
 from textual.reactive import reactive
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 import subprocess
 import platform
 import socket
-from dist.main import load_config, display_hosts
+from dist.main import load_config, display_hosts  # Retain this import
 
 console = Console()
 
@@ -54,19 +53,7 @@ class NetworkAutomationApp(App):
         if not self.hosts_config:
             self.output_log += "No hosts configured."
         else:
-            table = Table(
-                title="Available Devices", show_header=True, header_style="bold cyan"
-            )
-            table.add_column("No.", style="dim", width=6)
-            table.add_column("Hostname", style="bold")
-            table.add_column("Device Type", style="green")
-            table.add_column("Groups", style="magenta")
-
-            for idx, host in enumerate(self.hosts_config, start=1):
-                groups = ", ".join(host.get("groups", []))
-                table.add_row(str(idx), host["hostname"], host["device_type"], groups)
-
-            self.output_log += console.render_str(table)
+            display_hosts(self.hosts_config)  # Use the display_hosts function
 
     def run_main_app(self):
         self.output_log = "Running main app...\n"
