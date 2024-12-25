@@ -1,8 +1,7 @@
-import yaml
-from netmiko import ConnectHandler
 import os
-from datetime import datetime
+import yaml
 import logging
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 import threading
@@ -10,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
+from netmiko import ConnectHandler
 
 # Initialize Rich Console
 console = Console()
@@ -18,15 +18,15 @@ console = Console()
 logger = logging.getLogger("network_automation")
 logger.setLevel(logging.INFO)
 
-# File handler
+# File handler setup
 fh = logging.FileHandler("network_automation.log")
 fh.setLevel(logging.INFO)
 
-# Console handler
+# Console handler setup
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 
-# Formatter
+# Formatter setup
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
@@ -36,21 +36,29 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
-def load_config(file_path):
+def load_config(file_path: str) -> dict:
+    """
+    Load a YAML configuration file, ensure the 'results' directory exists,
+    and check for specific configuration settings.
+
+    :param file_path: Path to the YAML configuration file.
+    :return: Dictionary containing the configuration settings.
+    """
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
 
-            # Ensure the 'results' directory exists
-            results_dir = os.path.join(os.getcwd(), "results")
-            os.makedirs(results_dir, exist_ok=True)
+        # Ensure the 'results' directory exists
+        results_dir = os.path.join(os.getcwd(), "results")
+        os.makedirs(results_dir, exist_ok=True)
 
-            # Check if pause after command is enabled
-            pause_after_command = config.get("pause_after_command", False)
-            if pause_after_command:
-                logger.info("Pausing after each command is enabled.")
+        # Check if pause after command is enabled
+        pause_after_command = config.get("pause_after_command", False)
+        if pause_after_command:
+            logger.info("Pausing after each command is enabled.")
 
-            return config
+        return config
+
     except FileNotFoundError:
         logger.error(f"Configuration file '{file_path}' not found.")
         raise SystemExit(1)
@@ -168,6 +176,55 @@ def execute_commands(host, config):
         console.print(error_panel)
 
 
+def display_hosts(hosts):
+    table = Table(title="Available Devices", show_header=True, header_style="bold cyan")
+    table.add_column("No.", style="dim", width=6)
+    table.add_column("Hostname", style="bold")
+    table.add_column("Device Type", style="green")
+    table.add_column("Groups", style="magenta")
+
+    for idx, host in enumerate(hosts, start=1):
+        groups = ", ".join(host.get("groups", []))
+        table.add_row(str(idx), host["hostname"], host["device_type"], groups)
+
+    console.print(table)
+
+
+def get_user_selection(hosts, max_retries=3):
+    host_count = len(hosts)
+    selected_indices = []
+    retries = 0
+
+    while retries < max_retries:
+        selection = console.input(
+            "\nEnter the numbers of the devices you want to manage "
+            "(comma-separated, or 0 for all): "
+        )
+
+        if selection.strip() == "0":
+            return hosts
+
+        try:
+            indices = [int(x.strip()) for x in selection.split(",")]
+            for idx in indices:
+                if 1 <= idx <= host_count:
+                    selected_indices.append(idx - 1)
+                else:
+                    raise ValueError(f"Number {idx} is out of range.")
+            if selected_indices:
+                selected_hosts = [hosts[i] for i in selected_indices]
+                return selected_hosts
+        except ValueError as ve:
+            console.print(
+                f"[bold red]Invalid input: {ve}[/bold red]. Please try again."
+            )
+            retries += 1
+            selected_indices = []  # Reset selections on invalid input
+
+    console.print("[bold red]Maximum retries exceeded. Exiting.[/bold red]")
+    exit(1)
+
+
 def main():
     config = load_config("config.yaml")
     hosts_config = config.get("hosts", [])
@@ -196,7 +253,7 @@ def main():
             "[green]Executing Commands...", total=len(selected_hosts)
         )
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=6) as executor:  # Set max workers to 6
             futures = {
                 executor.submit(execute_commands, host, config): host
                 for host in selected_hosts
