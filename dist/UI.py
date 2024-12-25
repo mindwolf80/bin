@@ -1,6 +1,6 @@
 import curses
 import subprocess
-from main import load_config, display_hosts  # Import necessary functions
+from main import load_config  # Removed display_hosts as it's not suitable for curses
 
 
 def main_menu(stdscr):
@@ -48,15 +48,23 @@ def main_menu(stdscr):
             elif key in [ord("n"), ord("N")]:
                 return False
 
-    # Function to preview hosts using display_hosts
+    # Function to preview hosts within curses
     def preview_hosts(stdscr):
         stdscr.clear()
         stdscr.addstr(0, 0, "Previewing hosts from config.yaml:\n")
-        stdscr.refresh()
-        try:
-            display_hosts(hosts_config)  # Use the display_hosts function
-        except Exception as e:
-            stdscr.addstr(2, 0, f"Error displaying hosts: {e}")
+        if not hosts_config:
+            stdscr.addstr(2, 0, "No hosts configured.")
+        else:
+            for idx, host in enumerate(hosts_config, start=1):
+                stdscr.addstr(
+                    idx * 2, 0, f"{idx}. Hostname: {host.get('hostname', 'N/A')}"
+                )
+                stdscr.addstr(
+                    idx * 2 + 1, 0, f"   Device Type: {host.get('device_type', 'N/A')}"
+                )
+                stdscr.addstr(
+                    idx * 2 + 2, 0, f"   Groups: {', '.join(host.get('groups', []))}"
+                )
         stdscr.addstr("\nPress any key to return to the menu.")
         stdscr.refresh()
         stdscr.getch()
@@ -67,40 +75,46 @@ def main_menu(stdscr):
         stdscr.addstr(0, 0, "Running main app...\n")
         stdscr.refresh()
 
-        # Run main.py as a subprocess
-        process = subprocess.Popen(
-            ["python", "dist/main.py"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
+        try:
+            # Run main.py as a subprocess
+            process = subprocess.Popen(
+                ["python", "dist/main.py"],  # Ensure this path is correct
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
 
-        # Display output in real-time
-        output_lines = []
-        while True:
-            output = process.stdout.readline()
-            error = process.stderr.readline()
-            if output == "" and error == "" and process.poll() is not None:
-                break
-            if output:
-                output_lines.append(output.strip())
-            if error:
-                output_lines.append(f"ERROR: {error.strip()}")
+            # Display output in real-time
+            output_lines = []
+            while True:
+                output = process.stdout.readline()
+                error = process.stderr.readline()
+                if output == "" and error == "" and process.poll() is not None:
+                    break
+                if output:
+                    output_lines.append(output.strip())
+                if error:
+                    output_lines.append(f"ERROR: {error.strip()}")
 
-            # Display the last few lines of output
-            stdscr.clear()
-            for idx, line in enumerate(output_lines[-(stdscr.getmaxyx()[0] - 2) :]):
-                stdscr.addstr(idx, 0, line)
+                # Display the last few lines of output
+                stdscr.clear()
+                for idx, line in enumerate(output_lines[-(stdscr.getmaxyx()[0] - 2) :]):
+                    stdscr.addstr(idx, 0, line)
+                stdscr.refresh()
+
+            stdscr.addstr(
+                stdscr.getmaxyx()[0] - 1,
+                0,
+                "Main app execution completed. Press any key to return to the menu.",
+            )
+        except FileNotFoundError:
+            stdscr.addstr(2, 0, "Error: main.py not found at the specified path.")
+        except Exception as e:
+            stdscr.addstr(2, 0, f"Unexpected error: {e}")
+        finally:
             stdscr.refresh()
-
-        stdscr.addstr(
-            stdscr.getmaxyx()[0] - 1,
-            0,
-            "Main app execution completed. Press any key to return to the menu.",
-        )
-        stdscr.refresh()
-        stdscr.getch()
+            stdscr.getch()
 
     # Initialize colors
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
