@@ -4,7 +4,6 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 import yaml
-import threading
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -37,22 +36,13 @@ logger.addHandler(ch)
 
 
 def load_config(file_path: str) -> dict:
-    """
-    Load a YAML configuration file, ensure the 'results' directory exists,
-    and check for specific configuration settings.
-
-    :param file_path: Path to the YAML configuration file.
-    :return: Dictionary containing the configuration settings.
-    """
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
 
-        # Ensure the 'results' directory exists
         results_dir = os.path.join(os.getcwd(), "results")
         os.makedirs(results_dir, exist_ok=True)
 
-        # Check if pause after command is enabled
         pause_after_command = config.get("pause_after_command", False)
         if pause_after_command:
             logger.info("Pausing after each command is enabled.")
@@ -253,12 +243,19 @@ def main():
             "[green]Executing Commands...", total=len(selected_hosts)
         )
 
-        with ThreadPoolExecutor(max_workers=6) as executor:  # Set max workers to 6
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(execute_commands, host, config): host
                 for host in selected_hosts
             }
+
             for future in as_completed(futures):
+                host = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Error executing commands on {host['hostname']}: {e}")
+
                 progress.advance(task)
 
     logger.info(
