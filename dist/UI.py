@@ -1,19 +1,39 @@
 import curses
 import subprocess
-from main import load_config  # Removed display_hosts as it's not suitable for curses
+import platform
+import socket
+from main import load_config  # Import necessary functions
 
 
 def main_menu(stdscr):
-    # Clear screen
-    stdscr.clear()
-
     # Load configuration
-    config = load_config("config.yaml")
+    def load_configuration():
+        try:
+            return load_config("config.yaml")
+        except Exception as e:
+            stdscr.addstr(0, 0, f"Error loading configuration: {e}")
+            stdscr.refresh()
+            stdscr.getch()
+            return None
+
+    config = load_configuration()
+    if config is None:
+        return
     hosts_config = config.get("hosts", [])
-    skip_prompts = config.get("skip_prompts", False)
+    groups_config = config.get("groups", {})
 
     # Set up the menu
-    menu = ["Preview Hosts", "Run Main App", "Exit"]
+    menu = [
+        "Preview Hosts",
+        "Run Main App",
+        "Test Connectivity",
+        "Execute Commands for Specific Hosts",
+        "Execute Group-Specific Commands",
+        "View Groups and Associated Commands",
+        "View Logs",
+        "Reload Configuration",
+        "Exit",
+    ]
     current_row = 0
 
     # Function to print the menu
@@ -36,56 +56,41 @@ def main_menu(stdscr):
         stdscr.addstr(h - 2, 0, "Use arrow keys to navigate and ENTER to select.")
         stdscr.refresh()
 
-    # Function to show a confirmation prompt
-    def confirm_action(stdscr, action):
-        stdscr.clear()
-        stdscr.addstr(0, 0, f"Are you sure you want to {action}? (y/n)")
-        stdscr.refresh()
-        while True:
-            key = stdscr.getch()
-            if key in [ord("y"), ord("Y")]:
-                return True
-            elif key in [ord("n"), ord("N")]:
-                return False
-
-    # Function to preview hosts within curses
+    # Function to preview hosts
     def preview_hosts(stdscr):
         stdscr.clear()
         stdscr.addstr(0, 0, "Previewing hosts from config.yaml:\n")
         if not hosts_config:
             stdscr.addstr(2, 0, "No hosts configured.")
         else:
+            row = 2  # Start after the header
             for idx, host in enumerate(hosts_config, start=1):
-                stdscr.addstr(
-                    idx * 2, 0, f"{idx}. Hostname: {host.get('hostname', 'N/A')}"
+                hostname = host.get("hostname", "N/A")
+                device_type = host.get("device_type", "N/A")
+                groups = (
+                    ", ".join(host.get("groups", [])) if host.get("groups") else "None"
                 )
-                stdscr.addstr(
-                    idx * 2 + 1, 0, f"   Device Type: {host.get('device_type', 'N/A')}"
-                )
-                stdscr.addstr(
-                    idx * 2 + 2, 0, f"   Groups: {', '.join(host.get('groups', []))}"
-                )
-        stdscr.addstr("\nPress any key to return to the menu.")
+                stdscr.addstr(row, 0, f"{idx}. Hostname: {hostname}")
+                stdscr.addstr(row + 1, 0, f"   Device Type: {device_type}")
+                stdscr.addstr(row + 2, 0, f"   Groups: {groups}")
+                row += 4  # Add spacing between entries
+        stdscr.addstr(row, 0, "Press any key to return to the menu.")
         stdscr.refresh()
         stdscr.getch()
 
-    # Function to run main app and display output
+    # Function to run main app
     def run_main_app(stdscr):
         stdscr.clear()
         stdscr.addstr(0, 0, "Running main app...\n")
         stdscr.refresh()
-
         try:
-            # Run main.py as a subprocess
             process = subprocess.Popen(
-                ["python", "dist/main.py"],  # Ensure this path is correct
+                ["python", "dist/main.py"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
             )
-
-            # Display output in real-time
             output_lines = []
             while True:
                 output = process.stdout.readline()
@@ -97,7 +102,6 @@ def main_menu(stdscr):
                 if error:
                     output_lines.append(f"ERROR: {error.strip()}")
 
-                # Display the last few lines of output
                 stdscr.clear()
                 for idx, line in enumerate(output_lines[-(stdscr.getmaxyx()[0] - 2) :]):
                     stdscr.addstr(idx, 0, line)
@@ -108,24 +112,74 @@ def main_menu(stdscr):
                 0,
                 "Main app execution completed. Press any key to return to the menu.",
             )
-        except FileNotFoundError:
-            stdscr.addstr(2, 0, "Error: main.py not found at the specified path.")
         except Exception as e:
-            stdscr.addstr(2, 0, f"Unexpected error: {e}")
+            stdscr.addstr(2, 0, f"Error running main app: {e}")
         finally:
             stdscr.refresh()
             stdscr.getch()
+
+    # Function to test connectivity
+    def test_connectivity(stdscr):
+        stdscr.clear()
+        stdscr.addstr(0, 0, "Testing connectivity to hosts:\n")
+        row = 2
+        ping_flag = "-n" if platform.system().lower() == "windows" else "-c"
+
+        for host in hosts_config:
+            hostname = host.get("hostname", "N/A")
+            if hostname == "N/A":
+                stdscr.addstr(row, 0, f"Host entry missing hostname.")
+                row += 1
+                continue
+
+            # Initial ping test
+            try:
+                result = subprocess.run(
+                    ["ping", ping_flag, "1", hostname],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    stdscr.addstr(row, 0, f"{hostname}: Reachable via ping")
+                else:
+                    stdscr.addstr(
+                        row, 0, f"{hostname}: Unreachable via ping, testing ports..."
+                    )
+                    row += 1
+                    # Fall back to port testing
+                    row = test_ports(stdscr, hostname, row)
+            except Exception as e:
+                stdscr.addstr(row, 0, f"{hostname}: Error - {e}")
+            row += 2  # Add spacing between hosts
+
+        stdscr.addstr(row, 0, "Press any key to return to the menu.")
+        stdscr.refresh()
+        stdscr.getch()
+
+    # Function to test specific ports if ping fails
+    def test_ports(stdscr, hostname, row):
+        ports = [22, 80, 443]
+        for port in ports:
+            try:
+                sock = socket.create_connection((hostname, port), timeout=2)
+                stdscr.addstr(row, 0, f"   Port {port}: Open")
+                sock.close()
+            except socket.timeout:
+                stdscr.addstr(row, 0, f"   Port {port}: Timed out")
+            except socket.error as e:
+                stdscr.addstr(row, 0, f"   Port {port}: Closed - {e}")
+            row += 1
+        return row
 
     # Initialize colors
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
 
-    # Print the initial menu
+    # Main loop
     print_menu(stdscr, current_row)
-
     while True:
         key = stdscr.getch()
-
         if key == curses.KEY_UP and current_row > 0:
             current_row -= 1
         elif key == curses.KEY_DOWN and current_row < len(menu) - 1:
@@ -134,18 +188,12 @@ def main_menu(stdscr):
             if current_row == len(menu) - 1:
                 break  # Exit the program
 
-            action = menu[current_row]
-
-            if current_row == 1 and not skip_prompts:
-                if not confirm_action(stdscr, action):
-                    continue
-
             if current_row == 0:
-                # Preview hosts
                 preview_hosts(stdscr)
             elif current_row == 1:
-                # Run main app
                 run_main_app(stdscr)
+            elif current_row == 2:
+                test_connectivity(stdscr)
 
         print_menu(stdscr, current_row)
 
