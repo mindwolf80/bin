@@ -1,5 +1,6 @@
 import curses
-from main import load_config, display_hosts, main  # Import necessary functions
+import subprocess
+from main import load_config, display_hosts  # Import necessary functions
 
 
 def main_menu(stdscr):
@@ -60,6 +61,35 @@ def main_menu(stdscr):
         stdscr.refresh()
         stdscr.getch()
 
+    # Function to run main app and display output
+    def run_main_app(stdscr):
+        stdscr.clear()
+        stdscr.addstr(0, 0, "Running main app...\n")
+        stdscr.refresh()
+
+        # Run main.py as a subprocess
+        process = subprocess.Popen(
+            ["python", "dist/main.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        # Display output in real-time
+        while True:
+            output = process.stdout.readline()
+            if output == "" and process.poll() is not None:
+                break
+            if output:
+                stdscr.addstr(output)
+                stdscr.refresh()
+
+        stdscr.addstr(
+            "\nMain app execution completed. Press any key to return to the menu."
+        )
+        stdscr.refresh()
+        stdscr.getch()
+
     # Initialize colors
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_CYAN, curses.COLOR_BLACK)
@@ -89,19 +119,7 @@ def main_menu(stdscr):
                 preview_hosts(stdscr)
             elif current_row == 1:
                 # Run main app
-                stdscr.clear()
-                stdscr.addstr(0, 0, "Running main app...")
-                stdscr.refresh()
-                try:
-                    main()  # Directly call the main function from main.py
-                except Exception as e:
-                    stdscr.addstr(2, 0, f"Error running main app: {e}")
-                stdscr.addstr(
-                    4,
-                    0,
-                    "Main app execution completed. Press any key to return to the menu.",
-                )
-                stdscr.getch()
+                run_main_app(stdscr)
 
         print_menu(stdscr, current_row)
 
