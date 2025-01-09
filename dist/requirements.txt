@@ -1,4 +1,0 @@
-# pip install -r requirements.txt
-PyYAML>=6.0  # Ensure 6.0 or higher
-netmiko>=4.5.0  # Ensure 4.5.0 or higher
-rich>=13.5.2  # Ensure 13.5.2 or higher

@@ -1,5 +1,0 @@
-# Download these to grab and go
-1. CommandMate.exe
-2. config.yaml # You need to edit this to make it work.
-4. device types.txt
-3. launcher.bat
