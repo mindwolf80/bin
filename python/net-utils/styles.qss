@@ -1,0 +1,221 @@
+/* Modern Solar-inspired Theme */
+
+/* General Styling */
+QMainWindow {
+    background-color: #1e293b; /* Dark blue-gray background */
+    color: #e2e8f0; /* Light text */
+    font-size: 16px;
+    font-family: "Segoe UI", "Arial", sans-serif; /* Modern sans-serif font */
+}
+
+QLabel {
+    color: #e2e8f0; /* Light text */
+    font-size: 16px;
+    font-weight: bold; /* Bold labels for clarity */
+    margin-bottom: 8px;
+}
+
+/* Input Fields */
+QLineEdit, QComboBox, QTextEdit {
+    background-color: #334155; /* Darker gray background */
+    color: #e2e8f0; /* Light text */
+    border: 1px solid #475569; /* Slight border for separation */
+    border-radius: 6px; /* Rounded corners */
+    padding: 10px;
+    font-size: 16px;
+}
+
+QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
+    border: 1px solid #3b82f6; /* Blue border on focus */
+    outline: none;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); /* Glow effect */
+}
+
+/* Placeholder Text */
+QLineEdit::placeholder-text, QTextEdit::placeholder-text {
+    color: #94a3b8; /* Light gray placeholder text */
+    font-style: italic;
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #3b82f6; /* Default blue button */
+    color: #ffffff; /* White text */
+    border: 1px solid #2563eb; /* Slightly darker border */
+    border-radius: 6px; /* Rounded corners */
+    padding: 8px 16px;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.2s ease-in-out; /* Smooth hover and active transitions */
+}
+
+QPushButton:hover {
+    background-color: #2563eb; /* Darker blue on hover */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Soft shadow */
+}
+
+QPushButton:pressed {
+    background-color: #1d4ed8; /* Even darker blue on press */
+    box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.3); /* Inner shadow on press */
+}
+
+QPushButton:disabled:hover {
+    background-color: #3b82f6; /* Keep the same color when disabled */
+    box-shadow: none; /* No hover effect when disabled */
+}
+
+/* Specific Button Styles */
+
+/* Run Button */
+#run_btn {
+    background-color: #22c55e; /* Mild green */
+    border: 1px solid #16a34a;
+}
+
+#run_btn:hover {
+    background-color: #16a34a; /* Darker green */
+}
+
+#run_btn:pressed {
+    background-color: #15803d; /* Even darker green on press */
+}
+
+#run_btn:disabled:hover {
+    background-color: #22c55e; /* Keep the same color when disabled */
+}
+
+/* Pause Button */
+#pause_btn {
+    background-color: #f59e0b; /* Bright orange */
+    color: #ffffff; /* White text for contrast */
+    border: 1px solid #d97706;
+}
+
+#pause_btn:hover {
+    background-color: #d97706; /* Darker orange */
+}
+
+#pause_btn:pressed {
+    background-color: #b45309; /* Even darker orange */
+}
+
+#pause_btn:disabled:hover {
+    background-color: #f59e0b; /* Keep the same color when disabled */
+}
+
+/* Stop Button */
+#stop_btn {
+    background-color: #ef4444; /* Bright red */
+    color: #ffffff; /* White text */
+    border: 1px solid #dc2626;
+}
+
+#stop_btn:hover {
+    background-color: #dc2626; /* Darker red */
+}
+
+#stop_btn:pressed {
+    background-color: #b91c1c; /* Even darker red */
+}
+
+#stop_btn:disabled:hover {
+    background-color: #ef4444; /* Keep the same color when disabled */
+}
+
+/* Clear Output Button */
+#clear_btn {
+    background-color: #bfbfbf; /* Light gray */
+    border: 1px solid #8c8c8c;
+    color: #1e293b; /* Dark blue-gray text for contrast */
+}
+
+#clear_btn:hover {
+    background-color: #8c8c8c; /* Darker gray */
+}
+
+#clear_btn:pressed {
+    background-color: #6b7280; /* Even darker gray */
+}
+
+#clear_btn:disabled:hover {
+    background-color: #bfbfbf; /* Keep the same color when disabled */
+}
+
+/* Grouping Containers */
+QGroupBox {
+    border: 1px solid #475569; /* Subtle border for grouping */
+    border-radius: 8px;
+    margin-top: 16px;
+    padding: 10px;
+}
+
+QGroupBox::title {
+    color: #e2e8f0;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0 8px;
+}
+
+/* Menus */
+QMenuBar {
+    background-color: #1f2937; /* Darker blue-gray for menubar */
+    color: #e2e8f0;
+    border-bottom: 1px solid #475569;
+}
+
+QMenuBar::item {
+    padding: 6px 12px;
+    background-color: transparent;
+}
+
+QMenuBar::item:selected {
+    background-color: #3b82f6; /* Highlighted menu item */
+    color: #ffffff;
+}
+
+QMenu {
+    background-color: #334155; /* Same as input background */
+    color: #e2e8f0;
+    border: 1px solid #475569;
+}
+
+QMenu::item {
+    padding: 6px 24px;
+}
+
+QMenu::item:selected {
+    background-color: #3b82f6; /* Match menubar highlight */
+    color: #ffffff;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+    background: #334155;
+    width: 14px;
+}
+
+QScrollBar::handle:vertical {
+    background: #475569;
+    min-height: 30px;
+    border-radius: 7px;
+}
+
+/* Output Area */
+QTextEdit {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 10px;
+    font-family: "Courier New", monospace;
+    font-size: 16px;
+}
+
+/* Dialogs */
+QDialog {
+    background-color: #334155;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 10px;
+}
