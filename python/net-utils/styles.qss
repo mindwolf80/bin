@@ -4,13 +4,13 @@
 QMainWindow {
     background-color: #1e293b; /* Dark blue-gray background */
     color: #e2e8f0; /* Light text */
-    font-size: 16px;
+    font-size: 15px;
     font-family: "Segoe UI", "Arial", sans-serif; /* Modern sans-serif font */
 }
 
 QLabel {
     color: #e2e8f0; /* Light text */
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold; /* Bold labels for clarity */
     margin-bottom: 8px;
 }
@@ -22,7 +22,7 @@ QLineEdit, QComboBox, QTextEdit {
     border: 1px solid #475569; /* Slight border for separation */
     border-radius: 6px; /* Rounded corners */
     padding: 10px;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
@@ -44,7 +44,7 @@ QPushButton {
     border: 1px solid #2563eb; /* Slightly darker border */
     border-radius: 6px; /* Rounded corners */
     padding: 8px 16px;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
     transition: all 0.2s ease-in-out; /* Smooth hover and active transitions */
 }
@@ -169,7 +169,7 @@ QGroupBox {
 
 QGroupBox::title {
     color: #e2e8f0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
     padding: 0 8px;
 }
@@ -226,7 +226,7 @@ QTextEdit {
     border-radius: 6px;
     padding: 10px;
     font-family: "Courier New", monospace;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 /* Dialogs */

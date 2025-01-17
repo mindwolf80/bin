@@ -21,6 +21,16 @@ def resource_path(relative_path):
 
 
 class DeviceManager(QtWidgets.QMainWindow):
+    # HTML color codes for different elements
+    COLORS = {
+        "timestamp": "#808080",  # Gray
+        "error": "#dc2626",  # Red
+        "success": "#16a34a",  # Green
+        "command": "#60a5fa",  # Light blue
+        "separator": "#475569",  # Slate gray
+        "output": "#CBD5E1",  # Light gray for command output
+    }
+
     def __init__(self):
         super().__init__()
         self.workers = []
@@ -28,6 +38,22 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.completed_commands = 0
         self.total_commands = 0
         self.is_config_mode = False
+
+        # Get the device pixel ratio for high DPI scaling
+        self.pixel_ratio = QtWidgets.QApplication.instance().devicePixelRatio()
+        # Base sizes that will be scaled
+        self.base_sizes = {
+            "window_width": 1000,
+            "window_height": 800,
+            "min_width": 800,
+            "min_height": 600,
+            "sidebar_width": 300,
+            "font_size": 15,
+            "padding": 10,
+            "spacing": 10,
+            "border_radius": 6,
+        }
+
         self._initUI()
         self._setupConnections()
 
@@ -39,8 +65,17 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.expanding_both = QtWidgets.QSizePolicy(expanding, expanding)
 
         self.setWindowTitle("NetMate")
-        self.setGeometry(100, 100, 1000, 800)
-        self.setMinimumSize(800, 600)  # Set minimum window size
+        # Scale window geometry and minimum size based on pixel ratio
+        scaled_x = int(100 * self.pixel_ratio)
+        scaled_y = int(100 * self.pixel_ratio)
+        scaled_width = int(self.base_sizes["window_width"] * self.pixel_ratio)
+        scaled_height = int(self.base_sizes["window_height"] * self.pixel_ratio)
+        self.setGeometry(scaled_x, scaled_y, scaled_width, scaled_height)
+
+        # Set minimum window size with scaling
+        min_width = int(self.base_sizes["min_width"] * self.pixel_ratio)
+        min_height = int(self.base_sizes["min_height"] * self.pixel_ratio)
+        self.setMinimumSize(min_width, min_height)
 
         # Create central widget and main horizontal layout
         central_widget = QtWidgets.QWidget()
@@ -51,21 +86,33 @@ class DeviceManager(QtWidgets.QMainWindow):
 
         # Create sidebar
         sidebar_widget = QtWidgets.QWidget()
-        sidebar_widget.setFixedWidth(300)  # Fixed width for sidebar
+        # Scale sidebar width
+        scaled_sidebar_width = int(self.base_sizes["sidebar_width"] * self.pixel_ratio)
+        sidebar_widget.setFixedWidth(scaled_sidebar_width)
         sidebar_widget.setObjectName("sidebar")  # For styling
         sidebar_layout = QtWidgets.QVBoxLayout(sidebar_widget)
-        sidebar_layout.setSpacing(10)
-        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        # Scale spacing and margins
+        scaled_spacing = int(self.base_sizes["spacing"] * self.pixel_ratio)
+        scaled_padding = int(self.base_sizes["padding"] * self.pixel_ratio)
+        sidebar_layout.setSpacing(scaled_spacing)
+        sidebar_layout.setContentsMargins(
+            scaled_padding, scaled_padding, scaled_padding, scaled_padding
+        )
 
         # Create main content area
         main_content_widget = QtWidgets.QWidget()
         main_content_layout = QtWidgets.QVBoxLayout(main_content_widget)
-        main_content_layout.setSpacing(10)
+        main_content_layout.setSpacing(scaled_spacing)
         main_content_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create menu bar
         menubar = self.menuBar()
         file_menu = menubar.addMenu("File")
+        preferences_menu = menubar.addMenu("Preferences")
+
+        # Add Network Settings submenu
+        network_settings_action = preferences_menu.addAction("Network Settings")
+        network_settings_action.triggered.connect(self.show_network_settings)
 
         # Create Mode submenu
         mode_submenu = file_menu.addMenu("Mode")
@@ -117,28 +164,40 @@ class DeviceManager(QtWidgets.QMainWindow):
         credentials_group = QtWidgets.QGroupBox("Credentials")
         credentials_group.setObjectName("sidebar-group")
         credentials_layout = QtWidgets.QVBoxLayout()
-        
+
         # Username field
         username_label = QtWidgets.QLabel("Username:")
         self.username_input = QtWidgets.QLineEdit()
         self.username_input.setSizePolicy(self.expanding_fixed)
-        
+
         # Password field
         password_label = QtWidgets.QLabel("Password:")
         self.password_input = QtWidgets.QLineEdit()
         self.password_input.setSizePolicy(self.expanding_fixed)
         self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
-        
+
         # Device type field
         device_type_label = QtWidgets.QLabel("Device Type:")
         self.device_type = QtWidgets.QComboBox()
         self.device_type.setSizePolicy(self.expanding_fixed)
-        self.device_type.addItems([
-            "arista_eos", "cisco_apic", "cisco_asa", "cisco_ios",
-            "cisco_xe", "cisco_nxos", "cisco_ftd", "f5_linux",
-            "f5_ltm", "f5_tmsh", "fortinet", "juniper_junos",
-            "linux", "paloalto_panos",
-        ])
+        self.device_type.addItems(
+            [
+                "arista_eos",
+                "cisco_apic",
+                "cisco_asa",
+                "cisco_ios",
+                "cisco_xe",
+                "cisco_nxos",
+                "cisco_ftd",
+                "f5_linux",
+                "f5_ltm",
+                "f5_tmsh",
+                "fortinet",
+                "juniper_junos",
+                "linux",
+                "paloalto_panos",
+            ]
+        )
 
         # Add fields to credentials layout
         credentials_layout.addWidget(username_label)
@@ -210,6 +269,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         output_label = QtWidgets.QLabel("Output:")
         self.output_area = QtWidgets.QTextEdit()
         self.output_area.setReadOnly(True)
+        self.output_area.setAcceptRichText(True)
         self.output_area.setSizePolicy(self.expanding_both)
         self.output_area.setMinimumHeight(200)
 
@@ -230,25 +290,25 @@ class DeviceManager(QtWidgets.QMainWindow):
 
         # Create splitter for resizable areas
         splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
-        
+
         # Create container for input area
         input_container = QtWidgets.QWidget()
         input_container.setLayout(input_area_layout)
-        
+
         # Create container for output area
         output_container = QtWidgets.QWidget()
         output_layout = QtWidgets.QVBoxLayout(output_container)
         output_layout.setContentsMargins(0, 0, 0, 0)
         output_layout.addWidget(output_label)
         output_layout.addWidget(self.output_area)
-        
+
         # Add widgets to splitter
         splitter.addWidget(input_container)
         splitter.addWidget(output_container)
-        
+
         # Set initial sizes (40% input, 60% output)
         splitter.setSizes([400, 600])
-        
+
         # Add content to main area
         main_content_layout.addWidget(splitter)
         main_content_layout.addLayout(bottom_layout)
@@ -324,7 +384,7 @@ class DeviceManager(QtWidgets.QMainWindow):
                     QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                     QtWidgets.QMessageBox.No,
                 )
-                
+
                 if reply == QtWidgets.QMessageBox.Yes:
                     # Clear the log file and write a timestamp
                     with open(log_file, "w", encoding="utf-8") as f:
@@ -360,28 +420,47 @@ class DeviceManager(QtWidgets.QMainWindow):
         cursor.movePosition(QtGui.QTextCursor.End)
         self.output_area.setTextCursor(cursor)
 
-        separator = "=" * 70
-        if "CONNECTION ERROR" in command:
+        separator = f'<span style="color: {self.COLORS["separator"]}">{"=" * 70}</span>'
+
+        if "CONNECTION ERROR" in command or "ERROR" in command:
             self.output_area.append(f"\n{separator}")
-            self.output_area.append(f"[{timestamp}] ERROR: {host}")
-            self.output_area.append(f"{output}")
-            self.output_area.append(f"{separator}")
+            self.output_area.append(
+                f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
+                f'<span style="color: {self.COLORS["error"]}">ERROR: {host}</span>'
+            )
+            self.output_area.append(
+                f'<span style="color: {self.COLORS["error"]}">{output}</span>'
+            )
+            self.output_area.append(separator)
         else:
             self.output_area.append(f"\n{separator}")
-            ts = f"[{timestamp}]"
-            self.output_area.append(f"{ts} Connected")
-            self.output_area.append(f"to {host} as {username}")
-            self.output_area.append(f"\n$ {command}")
-            self.output_area.append(f"{output}")
-            self.output_area.append(f"{separator}")
+            # Timestamp and connection status
+            self.output_area.append(
+                f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
+                f'<span style="color: {self.COLORS["success"]}">Connected</span>'
+            )
+            self.output_area.append(
+                f'<span style="color: {self.COLORS["success"]}">to {host} as {username}</span>'
+            )
+            # Command with blue color
+            self.output_area.append(
+                f'\n<span style="color: {self.COLORS["command"]}">$ {command}</span>'
+            )
+            # Output in light gray
+            self.output_area.append(
+                f'<span style="color: {self.COLORS["output"]}">{output}</span>'
+            )
+            self.output_area.append(separator)
 
     def handle_progress(self, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = self.output_area.textCursor()
         cursor.movePosition(QtGui.QTextCursor.End)
         self.output_area.setTextCursor(cursor)
-        ts = f"[{timestamp}]"
-        self.output_area.append(f"\n{ts}\n{message}")
+        # Format progress messages with timestamp in gray
+        self.output_area.append(
+            f'\n<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span>\n{message}'
+        )
 
     def update_progress(self):
         """Update progress bar when a command is completed."""
@@ -399,7 +478,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         username = self.username_input.text().strip()
         password = self.password_input.text().strip()
         if not username or not password:
-            error_msg = "\n[ERROR] Please enter username and password"
+            error_msg = (
+                f'\n<span style="color: {self.COLORS["error"]}">'
+                f"[ERROR] Please enter username and password</span>"
+            )
             self.output_area.append(error_msg)
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter username and password"
@@ -409,7 +491,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Validate devices
         devices_text = self.devices_input.toPlainText().strip()
         if not devices_text:
-            error_msg = "\n[ERROR] Please enter at least one device"
+            error_msg = (
+                f'\n<span style="color: {self.COLORS["error"]}">'
+                f"[ERROR] Please enter at least one device</span>"
+            )
             self.output_area.append(error_msg)
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter at least one device"
@@ -419,7 +504,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Parse and validate devices
         devices = [d.strip() for d in devices_text.split("\n") if d.strip()]
         if not devices:
-            error_msg = "\n[ERROR] No valid devices found"
+            error_msg = (
+                f'\n<span style="color: {self.COLORS["error"]}">'
+                f"[ERROR] No valid devices found</span>"
+            )
             self.output_area.append(error_msg)
             QtWidgets.QMessageBox.warning(self, "Error", "No valid devices found")
             return
@@ -427,7 +515,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Validate commands
         commands_text = self.commands_input.toPlainText().strip()
         if not commands_text:
-            error_msg = "\n[ERROR] Please enter at least one command"
+            error_msg = (
+                f'\n<span style="color: {self.COLORS["error"]}">'
+                f"[ERROR] Please enter at least one command</span>"
+            )
             self.output_area.append(error_msg)
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter at least one command"
@@ -437,7 +528,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Parse and validate commands
         commands = [c.strip() for c in commands_text.split("\n") if c.strip()]
         if not commands:
-            error_msg = "\n[ERROR] No valid commands found"
+            error_msg = (
+                f'\n<span style="color: {self.COLORS["error"]}">'
+                f"[ERROR] No valid commands found</span>"
+            )
             self.output_area.append(error_msg)
             QtWidgets.QMessageBox.warning(self, "Error", "No valid commands found")
             return
@@ -450,8 +544,11 @@ class DeviceManager(QtWidgets.QMainWindow):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         mode_str = "Configuration" if self.is_config_mode else "Normal"
         start_msg = (
-            f"[{timestamp}] Starting execution in {mode_str} Mode...\n"
-            f"Devices: {len(devices)}, Commands: {len(commands)}"
+            f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
+            f'Starting execution in <span style="color: {self.COLORS["command"]}">'
+            f"{mode_str} Mode</span>...\n"
+            f'<span style="color: {self.COLORS["success"]}">Devices: {len(devices)}, '
+            f"Commands: {len(commands)}</span>"
         )
         self.output_area.append(start_msg)
 
@@ -496,7 +593,10 @@ class DeviceManager(QtWidgets.QMainWindow):
             self.stop_btn.setEnabled(False)  # Disable Stop button
             self.progress_bar.hide()
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.output_area.append(f"\n[{ts}] Done")
+            self.output_area.append(
+                f'\n<span style="color: {self.COLORS["timestamp"]}">[{ts}]</span> '
+                f'<span style="color: {self.COLORS["success"]}">Done</span>'
+            )
 
     def toggle_pause(self):
         """Toggle the pause state of the workers."""
@@ -550,7 +650,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.progress_bar.hide()
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.output_area.append(f"\n[{timestamp}] Execution stopped by user")
+        self.output_area.append(
+            f'\n<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
+            f'<span style="color: {self.COLORS["error"]}">Execution stopped by user</span>'
+        )
 
     def clear_output(self):
         self.output_area.clear()
@@ -724,6 +827,11 @@ class DeviceManager(QtWidgets.QMainWindow):
                     self, "Error", f"Failed to load session: {str(e)}"
                 )
 
+    def show_network_settings(self):
+        """Show the network settings dialog."""
+        dialog = NetworkSettingsDialog(self)
+        dialog.exec_()
+
     def save_credentials(self):
         try:
             import keyring
@@ -740,7 +848,7 @@ class DeviceManager(QtWidgets.QMainWindow):
                 try:
                     saved_users = keyring.get_password(service_name, "_saved_users_")
                     usernames = json.loads(saved_users) if saved_users else []
-                except:
+                except Exception:
                     usernames = []
 
                 if username not in usernames:
@@ -771,7 +879,7 @@ class DeviceManager(QtWidgets.QMainWindow):
             try:
                 saved_users = keyring.get_password(service_name, "_saved_users_")
                 usernames = json.loads(saved_users) if saved_users else []
-            except:
+            except Exception:
                 usernames = []
 
             if not usernames:
@@ -808,6 +916,112 @@ class DeviceManager(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(
                 self, "Error", f"Failed to load credentials: {str(e)}"
             )
+
+
+class NetworkSettingsDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Network Settings")
+        self.setMinimumWidth(400)
+        self.init_ui()
+        self.load_settings()
+
+    def init_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Connection Timeouts Group
+        conn_group = QtWidgets.QGroupBox("Connection Timeouts")
+        conn_layout = QtWidgets.QVBoxLayout()
+
+        # SSH Check Timeout
+        ssh_layout = QtWidgets.QHBoxLayout()
+        ssh_label = QtWidgets.QLabel("SSH Check Timeout (s):")
+        self.ssh_timeout = QtWidgets.QSpinBox()
+        self.ssh_timeout.setRange(1, 10)
+        self.ssh_timeout.setValue(3)
+        ssh_layout.addWidget(ssh_label)
+        ssh_layout.addWidget(self.ssh_timeout)
+
+        # Connection Retry
+        retry_layout = QtWidgets.QHBoxLayout()
+        retry_label = QtWidgets.QLabel("Connection Retry (s):")
+        self.conn_retry = QtWidgets.QSpinBox()
+        self.conn_retry.setRange(5, 60)
+        self.conn_retry.setValue(30)
+        retry_layout.addWidget(retry_label)
+        retry_layout.addWidget(self.conn_retry)
+
+        conn_layout.addLayout(ssh_layout)
+        conn_layout.addLayout(retry_layout)
+        conn_group.setLayout(conn_layout)
+
+        # Operation Timeouts Group
+        op_group = QtWidgets.QGroupBox("Operation Timeouts")
+        op_layout = QtWidgets.QVBoxLayout()
+
+        # Command Read Timeout
+        cmd_layout = QtWidgets.QHBoxLayout()
+        cmd_label = QtWidgets.QLabel("Command Read (s):")
+        self.cmd_timeout = QtWidgets.QSpinBox()
+        self.cmd_timeout.setRange(30, 300)
+        self.cmd_timeout.setValue(120)
+        cmd_layout.addWidget(cmd_label)
+        cmd_layout.addWidget(self.cmd_timeout)
+
+        # Authentication Timeout
+        auth_layout = QtWidgets.QHBoxLayout()
+        auth_label = QtWidgets.QLabel("Authentication (s):")
+        self.auth_timeout = QtWidgets.QSpinBox()
+        self.auth_timeout.setRange(5, 60)
+        self.auth_timeout.setValue(30)
+        auth_layout.addWidget(auth_label)
+        auth_layout.addWidget(self.auth_timeout)
+
+        op_layout.addLayout(cmd_layout)
+        op_layout.addLayout(auth_layout)
+        op_group.setLayout(op_layout)
+
+        # Add groups to main layout
+        layout.addWidget(conn_group)
+        layout.addWidget(op_group)
+
+        # Buttons
+        button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+        self.setLayout(layout)
+
+    def load_settings(self):
+        """Load saved network settings."""
+        try:
+            if os.path.exists("network_settings.json"):
+                with open("network_settings.json", "r") as f:
+                    settings = json.load(f)
+                    self.ssh_timeout.setValue(settings.get("ssh_timeout", 3))
+                    self.conn_retry.setValue(settings.get("conn_retry", 30))
+                    self.cmd_timeout.setValue(settings.get("cmd_timeout", 120))
+                    self.auth_timeout.setValue(settings.get("auth_timeout", 30))
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+
+    def accept(self):
+        """Save settings when OK is clicked."""
+        settings = {
+            "ssh_timeout": self.ssh_timeout.value(),
+            "conn_retry": self.conn_retry.value(),
+            "cmd_timeout": self.cmd_timeout.value(),
+            "auth_timeout": self.auth_timeout.value(),
+        }
+        try:
+            with open("network_settings.json", "w") as f:
+                json.dump(settings, f, indent=2)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+        super().accept()
 
 
 if __name__ == "__main__":

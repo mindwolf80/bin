@@ -1,5 +1,7 @@
 # handlers.py
+import json
 import logging
+import os
 import socket
 import threading
 
@@ -35,7 +37,14 @@ class NetmikoWorker(QtCore.QThread):
             is_config_mode (bool): Whether to execute commands in config mode
         """
         super().__init__()
-        self.device_info = {**device_info, "fast_cli": False}
+        self.settings = self.load_network_settings()
+        self.device_info = {
+            **device_info,
+            "fast_cli": False,
+            "timeout": self.settings['auth_timeout'],
+            "banner_timeout": self.settings['auth_timeout'],
+            "auth_timeout": self.settings['auth_timeout'],
+        }
         self.commands = commands
         self.is_running = True
         self.is_config_mode = is_config_mode
@@ -44,8 +53,30 @@ class NetmikoWorker(QtCore.QThread):
         self.pause_event.set()  # Initially not paused
         self.net_connect = None  # Store connection instance
 
-    def check_ssh_port(self, host, port=22, timeout=3):
+    def load_network_settings(self):
+        """Load network settings from JSON file."""
+        try:
+            if os.path.exists('network_settings.json'):
+                with open('network_settings.json', 'r') as f:
+                    settings = json.load(f)
+                    return {
+                        'ssh_timeout': settings.get('ssh_timeout', 3),
+                        'conn_retry': settings.get('conn_retry', 30),
+                        'cmd_timeout': settings.get('cmd_timeout', 120),
+                        'auth_timeout': settings.get('auth_timeout', 30)
+                    }
+        except Exception as e:
+            logger.error(f"Error loading network settings: {e}")
+        return {
+            'ssh_timeout': 3,
+            'conn_retry': 30,
+            'cmd_timeout': 120,
+            'auth_timeout': 30
+        }
+
+    def check_ssh_port(self, host, port=22, timeout=None):
         """Check if the SSH port is accessible."""
+        timeout = timeout or self.settings['ssh_timeout']
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 logger.info(f"SSH port {port} on {host} is accessible.")
@@ -60,7 +91,7 @@ class NetmikoWorker(QtCore.QThread):
 
     def run(self):
         """Main execution logic for the thread."""
-        retries = 2
+        retries = max(1, self.settings['conn_retry'] // 15)  # One retry per 15s of retry timeout
         for attempt in range(1, retries + 1):
             if not self.is_running:
                 logger.info("Thread stopped before completion.")
@@ -102,7 +133,7 @@ class NetmikoWorker(QtCore.QThread):
                     self.execute_config_commands(self.net_connect, username)
                 else:
                     self.execute_normal_commands(self.net_connect, username)
-                
+
                 if self.net_connect:
                     self.net_connect.disconnect()
                 return
@@ -134,7 +165,7 @@ class NetmikoWorker(QtCore.QThread):
                     )
                     output = net_connect.send_command(
                         command,
-                        read_timeout=120,
+                        read_timeout=self.settings['cmd_timeout'],
                         strip_prompt=True,
                         strip_command=True,
                     )
@@ -207,7 +238,11 @@ class NetmikoWorker(QtCore.QThread):
                 if not net_connect.check_config_mode():
                     net_connect.config_mode()
 
-                output = net_connect.send_config_set(valid_commands)
+                output = net_connect.send_config_set(
+                    valid_commands,
+                    cmd_verify=True,
+                    read_timeout=self.settings['cmd_timeout']
+                )
 
                 # Exit config mode
                 if net_connect.check_config_mode():
@@ -302,7 +337,7 @@ class NetmikoWorker(QtCore.QThread):
         with self._lock:
             self.is_running = False
             self.pause_event.set()  # Ensure the thread can exit if paused
-            
+
             # Force close any existing connection
             if self.net_connect:
                 try:
@@ -311,7 +346,7 @@ class NetmikoWorker(QtCore.QThread):
                 except Exception as e:
                     logger.error(f"Error during disconnect: {str(e)}")
                 self.net_connect = None
-            
+
         logger.info("Stopping thread...")
         self.progress_update.emit("Thread stopping...")
         self.quit()  # Properly quit the QThread
