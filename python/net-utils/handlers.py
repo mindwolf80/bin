@@ -42,6 +42,7 @@ class NetmikoWorker(QtCore.QThread):
         self._lock = threading.Lock()
         self.pause_event = threading.Event()
         self.pause_event.set()  # Initially not paused
+        self.net_connect = None  # Store connection instance
 
     def check_ssh_port(self, host, port=22, timeout=3):
         """Check if the SSH port is accessible."""
@@ -52,7 +53,9 @@ class NetmikoWorker(QtCore.QThread):
         except socket.timeout:
             logger.error(f"Timeout while checking SSH port {port} on {host}.")
         except socket.error as e:
-            logger.error(f"Socket error while checking SSH port {port} on {host}: {e}")
+            logger.error(
+                f"Socket error while checking SSH port {port} on {host}: {e}"
+            )
         return False
 
     def run(self):
@@ -67,7 +70,8 @@ class NetmikoWorker(QtCore.QThread):
                 username = self.device_info.get("username", "Unknown_User")
 
                 logger.info(
-                    f"Attempt {attempt}/{retries}: Initiating connection to {host}..."
+                    f"Attempt {attempt}/{retries}: "
+                    f"Initiating connection to {host}..."
                 )
                 self.progress_update.emit(
                     f"Establishing connection with {host} "
@@ -85,19 +89,23 @@ class NetmikoWorker(QtCore.QThread):
                     )
                     return
 
-                with ConnectHandler(**self.device_info) as net_connect:
-                    if not self.is_running:
-                        logger.info("Thread interrupted after connection.")
-                        return
-
-                    logger.info(f"Connected to {host} on attempt {attempt}.")
-                    self.progress_update.emit(f"Connected to {host}.")
-
-                    if self.is_config_mode:
-                        self.execute_config_commands(net_connect, username)
-                    else:
-                        self.execute_normal_commands(net_connect, username)
+                self.net_connect = ConnectHandler(**self.device_info)
+                if not self.is_running:
+                    logger.info("Thread interrupted after connection.")
+                    self.net_connect.disconnect()
                     return
+
+                logger.info(f"Connected to {host} on attempt {attempt}.")
+                self.progress_update.emit(f"Connected to {host}.")
+
+                if self.is_config_mode:
+                    self.execute_config_commands(self.net_connect, username)
+                else:
+                    self.execute_normal_commands(self.net_connect, username)
+                
+                if self.net_connect:
+                    self.net_connect.disconnect()
+                return
 
             except NetmikoAuthenticationException as e:
                 self.handle_error("AUTH ERROR", host, e)
@@ -135,13 +143,20 @@ class NetmikoWorker(QtCore.QThread):
                     error_msg = f"INVALID COMMAND: {command}"
                     logger.warning(error_msg)
                     self.output_ready.emit(
-                        username, self.device_info["host"], command, error_msg
+                        username,
+                        self.device_info["host"],
+                        command,
+                        error_msg,
                     )
                 else:
                     self.output_ready.emit(
-                        username, self.device_info["host"], command, output
+                        username,
+                        self.device_info["host"],
+                        command,
+                        output,
                     )
-                    self.command_completed.emit()  # Emit signal after command completion
+                    # Emit signal after command completion
+                    self.command_completed.emit()
 
             except Exception as e:
                 self.handle_error(
@@ -177,13 +192,15 @@ class NetmikoWorker(QtCore.QThread):
                 raise ValueError("No configuration commands provided.")
 
             valid_commands = [
-                cmd for cmd in self.commands if isinstance(cmd, str) and cmd.strip()
+                cmd for cmd in self.commands
+                if isinstance(cmd, str) and cmd.strip()
             ]
             if not valid_commands:
                 raise ValueError("No valid configuration commands found.")
 
             logger.debug(
-                f"Executing configuration commands on {self.device_info['host']}."
+                f"Executing configuration commands on "
+                f"{self.device_info['host']}."
             )
             try:
                 # Enter config mode and verify
@@ -220,16 +237,25 @@ class NetmikoWorker(QtCore.QThread):
                     e,
                 )
             except Exception as e:
+                error_msg = f"Failed to execute config commands: {str(e)}"
                 self.handle_error(
                     "CONFIG MODE ERROR",
                     self.device_info["host"],
-                    f"Failed to execute config commands: {str(e)}",
+                    error_msg,
                 )
 
         except ValueError as e:
-            self.handle_error("CONFIG VALIDATION ERROR", self.device_info["host"], e)
+            self.handle_error(
+                "CONFIG VALIDATION ERROR",
+                self.device_info["host"],
+                e,
+            )
         except Exception as e:
             self.handle_error("CONFIG ERROR", self.device_info["host"], e)
+
+    def _has_error_markers(self, line):
+        """Check if a line contains error markers."""
+        return line.strip().startswith("%") or "error" in line.lower()
 
     def is_invalid_command(self, output):
         """Check if the command output indicates an invalid command error."""
@@ -253,16 +279,12 @@ class NetmikoWorker(QtCore.QThread):
 
         # Check for error patterns
         for line in output_lines:
-            if any(error.lower() in line for error in error_indicators):
+            if any(err in line for err in error_indicators):
                 return True
 
         # Check for suspiciously short output that might indicate an error
         if len(output_lines) <= 2 and output.strip():
-            # Look for common error markers like % or error
-            return any(
-                line.strip().startswith("%") or "error" in line.lower()
-                for line in output_lines
-            )
+            return any(self._has_error_markers(line) for line in output_lines)
 
         return False
 
@@ -280,5 +302,16 @@ class NetmikoWorker(QtCore.QThread):
         with self._lock:
             self.is_running = False
             self.pause_event.set()  # Ensure the thread can exit if paused
+            
+            # Force close any existing connection
+            if self.net_connect:
+                try:
+                    self.net_connect.disconnect()
+                    logger.info(f"Disconnected from {self.device_info['host']}")
+                except Exception as e:
+                    logger.error(f"Error during disconnect: {str(e)}")
+                self.net_connect = None
+            
         logger.info("Stopping thread...")
         self.progress_update.emit("Thread stopping...")
+        self.quit()  # Properly quit the QThread

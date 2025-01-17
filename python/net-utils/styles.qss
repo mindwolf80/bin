@@ -84,7 +84,7 @@ QPushButton:disabled:hover {
     background-color: #22c55e; /* Keep the same color when disabled */
 }
 
-/* Pause Button */
+/* Pause/Resume Button */
 #pause_btn {
     background-color: #f59e0b; /* Bright orange */
     color: #ffffff; /* White text for contrast */
@@ -101,6 +101,24 @@ QPushButton:disabled:hover {
 
 #pause_btn:disabled:hover {
     background-color: #f59e0b; /* Keep the same color when disabled */
+}
+
+#resume_btn {
+    background-color: #3b82f6; /* Blue */
+    color: #ffffff;
+    border: 1px solid #2563eb;
+}
+
+#resume_btn:hover {
+    background-color: #2563eb; /* Darker blue */
+}
+
+#resume_btn:pressed {
+    background-color: #1d4ed8; /* Even darker blue */
+}
+
+#resume_btn:disabled:hover {
+    background-color: #3b82f6;
 }
 
 /* Stop Button */
@@ -218,4 +236,19 @@ QDialog {
     border: 1px solid #475569;
     border-radius: 8px;
     padding: 10px;
+}
+
+/* Splitter Handle */
+QSplitter::handle {
+    background-color: #94a3b8; /* Soothing gray color */
+    height: 2px;
+    margin: 4px 0;
+}
+
+QSplitter::handle:hover {
+    background-color: #64748b; /* Slightly darker on hover */
+}
+
+QSplitter::handle:pressed {
+    background-color: #475569; /* Even darker when pressed */
 }

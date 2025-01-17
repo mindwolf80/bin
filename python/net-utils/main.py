@@ -42,12 +42,26 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.setGeometry(100, 100, 1000, 800)
         self.setMinimumSize(800, 600)  # Set minimum window size
 
-        # Create central widget and main layout
+        # Create central widget and main horizontal layout
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_horizontal_layout = QtWidgets.QHBoxLayout(central_widget)
+        main_horizontal_layout.setSpacing(10)
+        main_horizontal_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Create sidebar
+        sidebar_widget = QtWidgets.QWidget()
+        sidebar_widget.setFixedWidth(300)  # Fixed width for sidebar
+        sidebar_widget.setObjectName("sidebar")  # For styling
+        sidebar_layout = QtWidgets.QVBoxLayout(sidebar_widget)
+        sidebar_layout.setSpacing(10)
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Create main content area
+        main_content_widget = QtWidgets.QWidget()
+        main_content_layout = QtWidgets.QVBoxLayout(main_content_widget)
+        main_content_layout.setSpacing(10)
+        main_content_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create menu bar
         menubar = self.menuBar()
@@ -99,54 +113,41 @@ class DeviceManager(QtWidgets.QMainWindow):
         clear_log_action = log_menu.addAction("Clear Log")
         clear_log_action.triggered.connect(self.clear_log)
 
-        # Create input fields with size policies
-        credentials_layout = QtWidgets.QHBoxLayout()
-        credentials_layout.setSpacing(10)
-
-        username_layout = QtWidgets.QVBoxLayout()
+        # Create credentials section in sidebar
+        credentials_group = QtWidgets.QGroupBox("Credentials")
+        credentials_group.setObjectName("sidebar-group")
+        credentials_layout = QtWidgets.QVBoxLayout()
+        
+        # Username field
         username_label = QtWidgets.QLabel("Username:")
         self.username_input = QtWidgets.QLineEdit()
-        # Apply size policies
         self.username_input.setSizePolicy(self.expanding_fixed)
-        username_layout.addWidget(username_label)
-        username_layout.addWidget(self.username_input)
-
-        password_layout = QtWidgets.QVBoxLayout()
+        
+        # Password field
         password_label = QtWidgets.QLabel("Password:")
         self.password_input = QtWidgets.QLineEdit()
         self.password_input.setSizePolicy(self.expanding_fixed)
         self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
-        password_layout.addWidget(password_label)
-        password_layout.addWidget(self.password_input)
-
-        device_type_layout = QtWidgets.QVBoxLayout()
+        
+        # Device type field
         device_type_label = QtWidgets.QLabel("Device Type:")
         self.device_type = QtWidgets.QComboBox()
         self.device_type.setSizePolicy(self.expanding_fixed)
-        self.device_type.addItems(
-            [
-                "arista_eos",
-                "cisco_apic",
-                "cisco_asa",
-                "cisco_ios",
-                "cisco_xe",
-                "cisco_nxos",
-                "cisco_ftd",
-                "f5_linux",
-                "f5_ltm",
-                "f5_tmsh",
-                "fortinet",
-                "juniper_junos",
-                "linux",
-                "paloalto_panos",
-            ]
-        )
-        device_type_layout.addWidget(device_type_label)
-        device_type_layout.addWidget(self.device_type)
+        self.device_type.addItems([
+            "arista_eos", "cisco_apic", "cisco_asa", "cisco_ios",
+            "cisco_xe", "cisco_nxos", "cisco_ftd", "f5_linux",
+            "f5_ltm", "f5_tmsh", "fortinet", "juniper_junos",
+            "linux", "paloalto_panos",
+        ])
 
-        credentials_layout.addLayout(username_layout)
-        credentials_layout.addLayout(password_layout)
-        credentials_layout.addLayout(device_type_layout)
+        # Add fields to credentials layout
+        credentials_layout.addWidget(username_label)
+        credentials_layout.addWidget(self.username_input)
+        credentials_layout.addWidget(password_label)
+        credentials_layout.addWidget(self.password_input)
+        credentials_layout.addWidget(device_type_label)
+        credentials_layout.addWidget(self.device_type)
+        credentials_group.setLayout(credentials_layout)
 
         # Create text areas with size policies
         devices_layout = QtWidgets.QVBoxLayout()
@@ -181,31 +182,29 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.progress_bar.setSizePolicy(self.expanding_fixed)
         self.progress_bar.hide()
 
-        # Create buttons
-        button_layout = QtWidgets.QHBoxLayout()
+        # Create controls section in sidebar
+        controls_group = QtWidgets.QGroupBox("Controls")
+        controls_group.setObjectName("sidebar-group")
+        controls_layout = QtWidgets.QVBoxLayout()
 
-        # Run Button
-        self.run_btn = QtWidgets.QPushButton("Run Commands")
+        # Create buttons with full width
+        self.run_btn = QtWidgets.QPushButton("Run")
         self.run_btn.setObjectName("run_btn")
-
-        # Pause Button
         self.pause_btn = QtWidgets.QPushButton("Pause")
         self.pause_btn.setObjectName("pause_btn")
-        self.pause_btn.setEnabled(True)  # Initially enabled
-
-        # Stop Button
+        self.pause_btn.setEnabled(True)
         self.stop_btn = QtWidgets.QPushButton("Stop")
         self.stop_btn.setObjectName("stop_btn")
-        self.stop_btn.setEnabled(True)  # Initially enabled
-
-        # Clear Terminal Output Button
+        self.stop_btn.setEnabled(True)
         self.clear_btn = QtWidgets.QPushButton("Clear Output")
+        self.clear_btn.setObjectName("clear_btn")
 
-        # Add buttons to layout
-        button_layout.addWidget(self.run_btn)
-        button_layout.addWidget(self.pause_btn)
-        button_layout.addWidget(self.stop_btn)
-        button_layout.addWidget(self.clear_btn)
+        # Add buttons to controls layout
+        controls_layout.addWidget(self.run_btn)
+        controls_layout.addWidget(self.pause_btn)
+        controls_layout.addWidget(self.stop_btn)
+        controls_layout.addWidget(self.clear_btn)
+        controls_group.setLayout(controls_layout)
 
         # Create output area with size policy
         output_label = QtWidgets.QLabel("Output:")
@@ -223,14 +222,40 @@ class DeviceManager(QtWidgets.QMainWindow):
         bottom_layout.addStretch()
         bottom_layout.addWidget(size_grip)
 
-        # Add all layouts to main layout with proper spacing
-        main_layout.addLayout(credentials_layout)
-        main_layout.addLayout(input_area_layout)
-        main_layout.addWidget(self.progress_bar)
-        main_layout.addLayout(button_layout)
-        main_layout.addWidget(output_label)
-        main_layout.addWidget(self.output_area)
-        main_layout.addLayout(bottom_layout)
+        # Add groups to sidebar
+        sidebar_layout.addWidget(credentials_group)
+        sidebar_layout.addWidget(controls_group)
+        sidebar_layout.addWidget(self.progress_bar)
+        sidebar_layout.addStretch()
+
+        # Create splitter for resizable areas
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        
+        # Create container for input area
+        input_container = QtWidgets.QWidget()
+        input_container.setLayout(input_area_layout)
+        
+        # Create container for output area
+        output_container = QtWidgets.QWidget()
+        output_layout = QtWidgets.QVBoxLayout(output_container)
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        output_layout.addWidget(output_label)
+        output_layout.addWidget(self.output_area)
+        
+        # Add widgets to splitter
+        splitter.addWidget(input_container)
+        splitter.addWidget(output_container)
+        
+        # Set initial sizes (40% input, 60% output)
+        splitter.setSizes([400, 600])
+        
+        # Add content to main area
+        main_content_layout.addWidget(splitter)
+        main_content_layout.addLayout(bottom_layout)
+
+        # Add sidebar and main content to horizontal layout
+        main_horizontal_layout.addWidget(sidebar_widget)
+        main_horizontal_layout.addWidget(main_content_widget)
 
     def toggle_config_mode(self):
         """Toggle between normal and configuration mode."""
@@ -291,12 +316,22 @@ class DeviceManager(QtWidgets.QMainWindow):
         try:
             log_file = "netmiko.log"
             if os.path.exists(log_file):
-                # Clear the log file and write a timestamp
-                with open(log_file, "w", encoding="utf-8") as f:
-                    f.write(f"# Log cleared on {datetime.now()}\n")
-                QtWidgets.QMessageBox.information(
-                    self, "Success", "Log file cleared successfully."
+                # Show confirmation dialog
+                reply = QtWidgets.QMessageBox.question(
+                    self,
+                    "Confirm Clear Log",
+                    "Are you sure you want to clear the log file?",
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.No,
                 )
+                
+                if reply == QtWidgets.QMessageBox.Yes:
+                    # Clear the log file and write a timestamp
+                    with open(log_file, "w", encoding="utf-8") as f:
+                        f.write(f"# Log cleared on {datetime.now()}\n")
+                    QtWidgets.QMessageBox.information(
+                        self, "Success", "Log file cleared successfully."
+                    )
             else:
                 QtWidgets.QMessageBox.warning(self, "Error", "Log file not found.")
         except Exception as e:
@@ -475,12 +510,27 @@ class DeviceManager(QtWidgets.QMainWindow):
         if self.pause_btn.text() == "Pause":
             # Change button to 'Resume' and pause workers
             self.pause_btn.setText("Resume")
+            self.pause_btn.setObjectName("resume_btn")  # Change style
+            self.pause_btn.setStyleSheet("""
+                #resume_btn {
+                    background-color: #3b82f6;
+                    border: 1px solid #2563eb;
+                }
+                #resume_btn:hover {
+                    background-color: #2563eb;
+                }
+                #resume_btn:pressed {
+                    background-color: #1d4ed8;
+                }
+            """)
             for worker in self.workers:
                 if worker.isRunning():
                     worker.pause()
         else:
             # Change button to 'Pause' and resume workers
             self.pause_btn.setText("Pause")
+            self.pause_btn.setObjectName("pause_btn")  # Restore original style
+            self.pause_btn.setStyleSheet("")  # Remove custom style to use QSS
             for worker in self.workers:
                 if worker.isRunning():
                     worker.resume()
