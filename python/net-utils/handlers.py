@@ -4,7 +4,7 @@ import logging
 import os
 import socket
 import threading
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from netmiko import ConnectHandler
 from netmiko.exceptions import (
     ConfigInvalidException,
@@ -23,35 +23,36 @@ logging.basicConfig(
 logger = logging.getLogger("netmiko")
 
 
+class DeviceBatch:
+    def __init__(self, devices, commands, is_config_mode=False):
+        self.devices = devices
+        self.commands = commands
+        self.is_config_mode = is_config_mode
+
+
 class NetmikoWorker(QtCore.QThread):
     output_ready = QtCore.pyqtSignal(str, str, str, str)
     progress_update = QtCore.pyqtSignal(str)
     command_completed = QtCore.pyqtSignal()  # Signal for progress tracking
+    batch_completed = QtCore.pyqtSignal(int)  # Signal for batch completion
 
-    def __init__(self, device_info, commands, is_config_mode=False):
+    def __init__(self, devices_info, commands, is_config_mode=False):
         """Initialize the NetmikoWorker thread.
 
         Args:
-            device_info (dict): Device connection parameters
+            devices_info (list): List of device connection parameters
             commands (list): List of commands to execute
             is_config_mode (bool): Whether to execute commands in config mode
         """
         super().__init__()
         self.settings = self.load_network_settings()
-        self.device_info = {
-            **device_info,
-            "fast_cli": False,
-            "timeout": self.settings['auth_timeout'],
-            "banner_timeout": self.settings['auth_timeout'],
-            "auth_timeout": self.settings['auth_timeout'],
-        }
+        self.devices_info = devices_info
         self.commands = commands
         self.is_running = True
         self.is_config_mode = is_config_mode
         self._lock = threading.Lock()
         self.pause_event = threading.Event()
         self.pause_event.set()  # Initially not paused
-        self.net_connect = None  # Store connection instance
 
     def load_network_settings(self):
         """Load network settings from JSON file."""
@@ -63,7 +64,9 @@ class NetmikoWorker(QtCore.QThread):
                         'ssh_timeout': settings.get('ssh_timeout', 3),
                         'conn_retry': settings.get('conn_retry', 30),
                         'cmd_timeout': settings.get('cmd_timeout', 120),
-                        'auth_timeout': settings.get('auth_timeout', 30)
+                        'auth_timeout': settings.get('auth_timeout', 30),
+                        'max_threads': settings.get('max_threads', 10),
+                        'batch_size': settings.get('batch_size', 5)
                     }
         except Exception as e:
             logger.error(f"Error loading network settings: {e}")
@@ -71,7 +74,9 @@ class NetmikoWorker(QtCore.QThread):
             'ssh_timeout': 3,
             'conn_retry': 30,
             'cmd_timeout': 120,
-            'auth_timeout': 30
+            'auth_timeout': 30,
+            'max_threads': 10,
+            'batch_size': 5
         }
 
     def check_ssh_port(self, host, port=22, timeout=None):
@@ -89,16 +94,27 @@ class NetmikoWorker(QtCore.QThread):
             )
         return False
 
-    def run(self):
-        """Main execution logic for the thread."""
-        retries = max(1, self.settings['conn_retry'] // 15)  # One retry per 15s of retry timeout
+    def process_device(self, device_info):
+        """Process a single device with retries."""
+        if not self.is_running:
+            return None
+
+        device_info = {
+            **device_info,
+            "fast_cli": False,
+            "timeout": self.settings['auth_timeout'],
+            "banner_timeout": self.settings['auth_timeout'],
+            "auth_timeout": self.settings['auth_timeout'],
+        }
+
+        retries = max(1, self.settings['conn_retry'] // 15)
         for attempt in range(1, retries + 1):
             if not self.is_running:
                 logger.info("Thread stopped before completion.")
-                return
+                return None
             try:
-                host = self.device_info["host"]
-                username = self.device_info.get("username", "Unknown_User")
+                host = device_info["host"]
+                username = device_info.get("username", "Unknown_User")
 
                 logger.info(
                     f"Attempt {attempt}/{retries}: "
@@ -118,38 +134,93 @@ class NetmikoWorker(QtCore.QThread):
                         "CONNECTION ERROR",
                         error_msg,
                     )
-                    return
+                    return None
 
-                self.net_connect = ConnectHandler(**self.device_info)
+                net_connect = ConnectHandler(**device_info)
                 if not self.is_running:
                     logger.info("Thread interrupted after connection.")
-                    self.net_connect.disconnect()
-                    return
+                    net_connect.disconnect()
+                    return None
 
                 logger.info(f"Connected to {host} on attempt {attempt}.")
                 self.progress_update.emit(f"Connected to {host}.")
 
-                if self.is_config_mode:
-                    self.execute_config_commands(self.net_connect, username)
-                else:
-                    self.execute_normal_commands(self.net_connect, username)
-
-                if self.net_connect:
-                    self.net_connect.disconnect()
-                return
+                try:
+                    if self.is_config_mode:
+                        self.execute_config_commands(net_connect, username, device_info)
+                    else:
+                        self.execute_normal_commands(net_connect, username, device_info)
+                finally:
+                    if net_connect:
+                        net_connect.disconnect()
+                return True
 
             except NetmikoAuthenticationException as e:
                 self.handle_error("AUTH ERROR", host, e)
-                break
+                return False
             except NetmikoTimeoutException as e:
                 self.handle_error("TIMEOUT ERROR", host, e)
+                if attempt == retries:
+                    return False
             except SSHException as e:
                 self.handle_error("SSH ERROR", host, e)
+                if attempt == retries:
+                    return False
             except Exception as e:
                 self.handle_error("CRITICAL ERROR", host, e)
-                break
+                return False
+        return False
 
-    def execute_normal_commands(self, net_connect, username):
+    def run(self):
+        """Main execution logic for the thread using thread pool."""
+        try:
+            settings = self.load_network_settings()
+            max_workers = settings.get('max_threads', 10)
+            batch_size = settings.get('batch_size', 5)
+
+            # Process devices in batches
+            for i in range(0, len(self.devices_info), batch_size):
+                if not self.is_running:
+                    break
+
+                batch = self.devices_info[i:i + batch_size]
+                completed = 0
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all devices in the batch to the thread pool
+                    future_to_device = {
+                        executor.submit(self.process_device, device): device
+                        for device in batch
+                    }
+
+                    # Process completed futures as they finish
+                    for future in as_completed(future_to_device):
+                        if not self.is_running:
+                            break
+
+                        device = future_to_device[future]
+                        try:
+                            success = future.result()
+                            if success:
+                                completed += 1
+                        except Exception as e:
+                            self.handle_error(
+                                "EXECUTION ERROR",
+                                device["host"],
+                                str(e)
+                            )
+
+                    # Emit batch completion signal
+                    self.batch_completed.emit(completed)
+
+                    # Wait for pause if needed
+                    self.pause_event.wait()
+
+        except Exception as e:
+            logger.error(f"Thread pool execution error: {str(e)}")
+            self.progress_update.emit(f"Execution error: {str(e)}")
+
+    def execute_normal_commands(self, net_connect, username, device_info):
         """Execute a list of commands in normal mode."""
         for command in self.commands:
             self.pause_event.wait()  # Wait if paused
@@ -160,7 +231,7 @@ class NetmikoWorker(QtCore.QThread):
                 with self._lock:
                     logger.debug(
                         "Executing command: {} on {}".format(
-                            command, self.device_info["host"]
+                            command, device_info["host"]
                         )
                     )
                     output = net_connect.send_command(
@@ -175,14 +246,14 @@ class NetmikoWorker(QtCore.QThread):
                     logger.warning(error_msg)
                     self.output_ready.emit(
                         username,
-                        self.device_info["host"],
+                        device_info["host"],
                         command,
                         error_msg,
                     )
                 else:
                     self.output_ready.emit(
                         username,
-                        self.device_info["host"],
+                        device_info["host"],
                         command,
                         output,
                     )
@@ -192,7 +263,7 @@ class NetmikoWorker(QtCore.QThread):
             except Exception as e:
                 self.handle_error(
                     "COMMAND ERROR",
-                    self.device_info["host"],
+                    device_info["host"],
                     e,
                     command,
                 )
@@ -216,7 +287,7 @@ class NetmikoWorker(QtCore.QThread):
                 logger.info("Execution resumed.")
                 self.progress_update.emit("Execution resumed...")
 
-    def execute_config_commands(self, net_connect, username):
+    def execute_config_commands(self, net_connect, username, device_info):
         """Execute commands in configuration mode."""
         try:
             if not self.commands:
@@ -231,7 +302,7 @@ class NetmikoWorker(QtCore.QThread):
 
             logger.debug(
                 f"Executing configuration commands on "
-                f"{self.device_info['host']}."
+                f"{device_info['host']}."
             )
             try:
                 # Enter config mode and verify
@@ -252,13 +323,13 @@ class NetmikoWorker(QtCore.QThread):
                 if self.is_invalid_command(output):
                     self.handle_error(
                         "CONFIG INVALID ERROR",
-                        self.device_info["host"],
+                        device_info["host"],
                         "One or more commands resulted in error",
                     )
                 else:
                     self.output_ready.emit(
                         username,
-                        self.device_info["host"],
+                        device_info["host"],
                         "CONFIG MODE",
                         output,
                     )
@@ -268,25 +339,25 @@ class NetmikoWorker(QtCore.QThread):
             except ConfigInvalidException as e:
                 self.handle_error(
                     "CONFIG INVALID ERROR",
-                    self.device_info["host"],
+                    device_info["host"],
                     e,
                 )
             except Exception as e:
                 error_msg = f"Failed to execute config commands: {str(e)}"
                 self.handle_error(
                     "CONFIG MODE ERROR",
-                    self.device_info["host"],
+                    device_info["host"],
                     error_msg,
                 )
 
         except ValueError as e:
             self.handle_error(
                 "CONFIG VALIDATION ERROR",
-                self.device_info["host"],
+                device_info["host"],
                 e,
             )
         except Exception as e:
-            self.handle_error("CONFIG ERROR", self.device_info["host"], e)
+            self.handle_error("CONFIG ERROR", device_info["host"], e)
 
     def _has_error_markers(self, line):
         """Check if a line contains error markers."""
@@ -329,23 +400,18 @@ class NetmikoWorker(QtCore.QThread):
         if command:
             error_msg += f" (Command: {command})"
         logger.error(error_msg)
-        username = self.device_info.get("username", "Unknown_User")
-        self.output_ready.emit(username, host, error_type, error_msg)
+        self.output_ready.emit(
+            "Unknown_User",  # We don't have device_info in this context
+            host,
+            error_type,
+            error_msg
+        )
 
     def stop(self):
         """Gracefully stop the thread and clean up resources."""
         with self._lock:
             self.is_running = False
             self.pause_event.set()  # Ensure the thread can exit if paused
-
-            # Force close any existing connection
-            if self.net_connect:
-                try:
-                    self.net_connect.disconnect()
-                    logger.info(f"Disconnected from {self.device_info['host']}")
-                except Exception as e:
-                    logger.error(f"Error during disconnect: {str(e)}")
-                self.net_connect = None
 
         logger.info("Stopping thread...")
         self.progress_update.emit("Thread stopping...")
