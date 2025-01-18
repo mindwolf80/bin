@@ -712,6 +712,9 @@ class DeviceManager(QtWidgets.QMainWindow):
     def view_results(self):
         """Display the results CSV in a properly formatted table."""
         try:
+            # Increase CSV field size limit to 1MB
+            csv.field_size_limit(1024 * 1024)  # 1MB in bytes
+
             # Path to the CSV file
             filename, _ = QtWidgets.QFileDialog.getOpenFileName(
                 self, "Open Results File", "", "CSV Files (*.csv)"
