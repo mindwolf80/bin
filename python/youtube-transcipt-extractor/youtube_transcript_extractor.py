@@ -1,12 +1,11 @@
+import re
 import tkinter as tk
 from tkinter import filedialog
-import re
+
 import ttkbootstrap as ttk
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (
-    TranscriptsDisabled,
-    NoTranscriptFound
-)
+from youtube_transcript_api._errors import (NoTranscriptFound,
+                                            TranscriptsDisabled)
 
 
 def format_timestamp(seconds):
@@ -18,36 +17,88 @@ def format_timestamp(seconds):
 
 def format_transcript_text(transcript):
     """
-    Format transcript entries into readable paragraphs.
-    Combines consecutive entries that are part of the same sentence.
+    Format transcript entries into academic-style paragraphs:
+    - Groups 6-8 sentences into paragraphs (200-300 words)
+    - Maintains logical topic grouping
+    - Includes clear timestamp markers
     """
+    import textwrap
+    
     if not transcript:
         return "No transcript data available."
         
     formatted_text = []
     current_paragraph = []
-
+    last_timestamp = None
+    sentence_count = 0
+    word_count = 0
+    
+    def format_paragraph(texts, timestamp):
+        """Helper to format a single paragraph with proper wrapping"""
+        if not texts:
+            return ""
+        # Join texts and wrap to 80 characters for academic style
+        full_text = " ".join(texts)
+        # Initial indent for timestamp, subsequent lines aligned
+        wrapped = textwrap.fill(
+            full_text,
+            width=80,  # Standard academic width
+            initial_indent=f"[{timestamp}] ",  # Timestamp at start
+            subsequent_indent=" " * 8,  # Align with text after timestamp
+            break_long_words=True,
+            break_on_hyphens=True
+        )
+        return wrapped
+    
+    # Major topic transition phrases
+    topic_transitions = [
+        "next", "now", "however", "furthermore", "moreover",
+        "in addition", "finally", "therefore", "consequently",
+        "first", "second", "third", "last", "in conclusion"
+    ]
+    
     for entry in transcript:
         text = entry["text"].strip()
         timestamp = format_timestamp(entry["start"])
-
-        # Check if current paragraph should end
-        ends_sentence = (
-            current_paragraph and
-            any(current_paragraph[-1].endswith(p) for p in ".!?")
+        
+        # Count sentences and words
+        sentences_in_text = len([s for s in text.split() if s.endswith((".","!","?"))])
+        words_in_text = len(text.split())
+        
+        # Determine if we should start a new paragraph
+        new_paragraph = (
+            current_paragraph and (
+                # Academic paragraph size limits
+                sentence_count >= 8 or  # Max sentences per paragraph
+                word_count + words_in_text > 300 or  # Max words per paragraph
+                # Topic transitions
+                any(text.lower().startswith(p) for p in topic_transitions) or
+                # Significant time gap (new section)
+                entry["start"] - last_timestamp > 5  # 5 second gap indicates new section
+            )
         )
-        if ends_sentence:
-            paragraph_text = " ".join(current_paragraph)
-            formatted_text.append(f"[{timestamp}] {paragraph_text}")
+        
+        if new_paragraph:
+            formatted_text.append(
+                format_paragraph(current_paragraph, format_timestamp(last_timestamp))
+            )
             current_paragraph = [text]
+            sentence_count = sentences_in_text
+            word_count = words_in_text
         else:
             current_paragraph.append(text)
-
-    # Add any remaining text
+            sentence_count += sentences_in_text
+            word_count += words_in_text
+            
+        last_timestamp = entry["start"]
+    
+    # Add remaining text
     if current_paragraph:
-        paragraph_text = " ".join(current_paragraph)
-        formatted_text.append(f"[{timestamp}] {paragraph_text}")
-
+        formatted_text.append(
+            format_paragraph(current_paragraph, format_timestamp(last_timestamp))
+        )
+    
+    # Join paragraphs with double newline
     return "\n\n".join(formatted_text)
 
 

@@ -1,3 +1,5 @@
-#pip install ttkbootstrap youtube-transcript-api
-ttkbootstrap
-youtube-transcript-api
+# Core dependencies
+ttkbootstrap>=1.0.0  # Modern themed widgets for tkinter
+youtube-transcript-api>=0.6.0  # YouTube transcript fetching
+
+# Note: textwrap is part of Python's standard library, no need to install separately
