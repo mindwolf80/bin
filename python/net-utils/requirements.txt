@@ -1,4 +1,4 @@
-PyQt5>=5.15.0
+PyQt6>=6.4.0
 netmiko>=4.1.0
 keyring>=23.0.0
 paramiko>=2.8.0

@@ -5,7 +5,7 @@ import os
 import sys
 from datetime import datetime
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from handlers import NetmikoWorker
 
@@ -18,6 +18,144 @@ def resource_path(relative_path):
     if base_path:
         return os.path.join(base_path, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
+
+
+class NetworkSettingsDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Network Settings")
+        self.setMinimumWidth(400)
+        self.init_ui()
+        self.load_settings()
+
+    def init_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Thread Pool Settings Group
+        pool_group = QtWidgets.QGroupBox("Thread Pool Settings")
+        pool_layout = QtWidgets.QVBoxLayout()
+
+        # Maximum Threads
+        threads_layout = QtWidgets.QHBoxLayout()
+        threads_label = QtWidgets.QLabel("Maximum Threads:")
+        self.max_threads = QtWidgets.QSpinBox()
+        self.max_threads.setRange(1, 50)
+        self.max_threads.setValue(10)
+        threads_layout.addWidget(threads_label)
+        threads_layout.addWidget(self.max_threads)
+
+        # Batch Size
+        batch_layout = QtWidgets.QHBoxLayout()
+        batch_label = QtWidgets.QLabel("Batch Size:")
+        self.batch_size = QtWidgets.QSpinBox()
+        self.batch_size.setRange(1, 100)
+        self.batch_size.setValue(5)
+        batch_layout.addWidget(batch_label)
+        batch_layout.addWidget(self.batch_size)
+
+        pool_layout.addLayout(threads_layout)
+        pool_layout.addLayout(batch_layout)
+        pool_group.setLayout(pool_layout)
+
+        # Connection Timeouts Group
+        conn_group = QtWidgets.QGroupBox("Connection Timeouts")
+        conn_layout = QtWidgets.QVBoxLayout()
+
+        # SSH Check Timeout
+        ssh_layout = QtWidgets.QHBoxLayout()
+        ssh_label = QtWidgets.QLabel("SSH Check Timeout (s):")
+        self.ssh_timeout = QtWidgets.QSpinBox()
+        self.ssh_timeout.setRange(1, 10)
+        self.ssh_timeout.setValue(3)
+        ssh_layout.addWidget(ssh_label)
+        ssh_layout.addWidget(self.ssh_timeout)
+
+        # Connection Retry
+        retry_layout = QtWidgets.QHBoxLayout()
+        retry_label = QtWidgets.QLabel("Connection Retry (s):")
+        self.conn_retry = QtWidgets.QSpinBox()
+        self.conn_retry.setRange(5, 60)
+        self.conn_retry.setValue(30)
+        retry_layout.addWidget(retry_label)
+        retry_layout.addWidget(self.conn_retry)
+
+        conn_layout.addLayout(ssh_layout)
+        conn_layout.addLayout(retry_layout)
+        conn_group.setLayout(conn_layout)
+
+        # Operation Timeouts Group
+        op_group = QtWidgets.QGroupBox("Operation Timeouts")
+        op_layout = QtWidgets.QVBoxLayout()
+
+        # Command Read Timeout
+        cmd_layout = QtWidgets.QHBoxLayout()
+        cmd_label = QtWidgets.QLabel("Command Read (s):")
+        self.cmd_timeout = QtWidgets.QSpinBox()
+        self.cmd_timeout.setRange(30, 300)
+        self.cmd_timeout.setValue(120)
+        cmd_layout.addWidget(cmd_label)
+        cmd_layout.addWidget(self.cmd_timeout)
+
+        # Authentication Timeout
+        auth_layout = QtWidgets.QHBoxLayout()
+        auth_label = QtWidgets.QLabel("Authentication (s):")
+        self.auth_timeout = QtWidgets.QSpinBox()
+        self.auth_timeout.setRange(5, 60)
+        self.auth_timeout.setValue(30)
+        auth_layout.addWidget(auth_label)
+        auth_layout.addWidget(self.auth_timeout)
+
+        op_layout.addLayout(cmd_layout)
+        op_layout.addLayout(auth_layout)
+        op_group.setLayout(op_layout)
+
+        # Add groups to main layout
+        layout.addWidget(pool_group)
+        layout.addWidget(conn_group)
+        layout.addWidget(op_group)
+
+        # Buttons
+        button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | 
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+        self.setLayout(layout)
+
+    def load_settings(self):
+        """Load saved network settings."""
+        try:
+            if os.path.exists("network_settings.json"):
+                with open("network_settings.json", "r") as f:
+                    settings = json.load(f)
+                    self.ssh_timeout.setValue(settings.get("ssh_timeout", 3))
+                    self.conn_retry.setValue(settings.get("conn_retry", 30))
+                    self.cmd_timeout.setValue(settings.get("cmd_timeout", 120))
+                    self.auth_timeout.setValue(settings.get("auth_timeout", 30))
+                    self.max_threads.setValue(settings.get("max_threads", 10))
+                    self.batch_size.setValue(settings.get("batch_size", 5))
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+
+    def accept(self):
+        """Save settings when OK is clicked."""
+        settings = {
+            "ssh_timeout": self.ssh_timeout.value(),
+            "conn_retry": self.conn_retry.value(),
+            "cmd_timeout": self.cmd_timeout.value(),
+            "auth_timeout": self.auth_timeout.value(),
+            "max_threads": self.max_threads.value(),
+            "batch_size": self.batch_size.value(),
+        }
+        try:
+            with open("network_settings.json", "w") as f:
+                json.dump(settings, f, indent=2)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+        super().accept()
 
 
 class DeviceManager(QtWidgets.QMainWindow):
@@ -59,8 +197,8 @@ class DeviceManager(QtWidgets.QMainWindow):
 
     def _initUI(self):
         # Create common size policies
-        expanding = QtWidgets.QSizePolicy.Expanding
-        fixed = QtWidgets.QSizePolicy.Fixed
+        expanding = QtWidgets.QSizePolicy.Policy.Expanding
+        fixed = QtWidgets.QSizePolicy.Policy.Fixed
         self.expanding_fixed = QtWidgets.QSizePolicy(expanding, fixed)
         self.expanding_both = QtWidgets.QSizePolicy(expanding, expanding)
 
@@ -108,16 +246,16 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Create menu bar
         menubar = self.menuBar()
         file_menu = menubar.addMenu("File")
+        options_menu = menubar.addMenu("Options")
         preferences_menu = menubar.addMenu("Preferences")
 
         # Add Network Settings submenu
         network_settings_action = preferences_menu.addAction("Network Settings")
         network_settings_action.triggered.connect(self.show_network_settings)
 
-        # Create Mode submenu
-        mode_submenu = file_menu.addMenu("Mode")
+        # Create Mode submenu under Options
         config_mode_action = "Enable Config Mode"
-        self.toggle_config_mode_action = mode_submenu.addAction(config_mode_action)
+        self.toggle_config_mode_action = options_menu.addAction(config_mode_action)
         self.toggle_config_mode_action.setCheckable(True)
         self.toggle_config_mode_action.triggered.connect(self.toggle_config_mode)
 
@@ -174,7 +312,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         password_label = QtWidgets.QLabel("Password:")
         self.password_input = QtWidgets.QLineEdit()
         self.password_input.setSizePolicy(self.expanding_fixed)
-        self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
 
         # Device type field
         device_type_label = QtWidgets.QLabel("Device Type:")
@@ -289,7 +427,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         sidebar_layout.addStretch()
 
         # Create splitter for resizable areas
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
 
         # Create container for input area
         input_container = QtWidgets.QWidget()
@@ -340,7 +478,7 @@ class DeviceManager(QtWidgets.QMainWindow):
                 layout = QtWidgets.QVBoxLayout(central_widget)
 
                 # Create log text area with proper size policies
-                expanding = QtWidgets.QSizePolicy.Expanding
+                expanding = QtWidgets.QSizePolicy.Policy.Expanding
                 log_text = QtWidgets.QTextEdit()
                 log_text.setReadOnly(True)
                 log_text.setPlainText(log_content)
@@ -381,11 +519,11 @@ class DeviceManager(QtWidgets.QMainWindow):
                     self,
                     "Confirm Clear Log",
                     "Are you sure you want to clear the log file?",
-                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                    QtWidgets.QMessageBox.No,
+                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                    QtWidgets.QMessageBox.StandardButton.No,
                 )
 
-                if reply == QtWidgets.QMessageBox.Yes:
+                if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                     # Clear the log file and write a timestamp
                     with open(log_file, "w", encoding="utf-8") as f:
                         f.write(f"# Log cleared on {datetime.now()}\n")
@@ -417,7 +555,7 @@ class DeviceManager(QtWidgets.QMainWindow):
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = self.output_area.textCursor()
-        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         self.output_area.setTextCursor(cursor)
 
         separator = f'<span style="color: {self.COLORS["separator"]}">{"=" * 70}</span>'
@@ -455,7 +593,7 @@ class DeviceManager(QtWidgets.QMainWindow):
     def handle_progress(self, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = self.output_area.textCursor()
-        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         self.output_area.setTextCursor(cursor)
         # Format progress messages with timestamp in gray
         self.output_area.append(
@@ -676,117 +814,6 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.results.clear()
         self.progress_bar.hide()
 
-    def save_results(self):
-        if not self.results:
-            QtWidgets.QMessageBox.warning(self, "Error", "No results to save")
-            return
-
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Results", "", "CSV Files (*.csv)"
-        )
-
-        if filename:
-            try:
-                with open(filename, "w", encoding="utf-8", newline="") as f:
-                    writer = csv.DictWriter(
-                        f,
-                        fieldnames=[
-                            "timestamp",
-                            "username",
-                            "host",
-                            "command",
-                            "output",
-                        ],
-                    )
-                    writer.writeheader()
-                    writer.writerows(self.results)
-
-                QtWidgets.QMessageBox.information(
-                    self, "Success", "Results saved successfully"
-                )
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(
-                    self, "Error", f"Failed to save results: {str(e)}"
-                )
-
-    def view_results(self):
-        """Display the results CSV in a properly formatted table."""
-        try:
-            # Increase CSV field size limit to 1MB
-            csv.field_size_limit(1024 * 1024)  # 1MB in bytes
-
-            # Path to the CSV file
-            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
-                self, "Open Results File", "", "CSV Files (*.csv)"
-            )
-
-            if filename:  # Check if the user selected a file
-                # Read the CSV content
-                with open(filename, "r", encoding="utf-8") as file:
-                    reader = csv.DictReader(file)
-                    headers = reader.fieldnames  # Get headers
-                    data = [row for row in reader]  # Read rows as dictionaries
-
-                # Create a dialog window
-                dialog = QtWidgets.QDialog(self)
-                dialog.setWindowTitle("View Results")
-                dialog.setGeometry(100, 100, 1000, 600)
-                dialog.setMinimumSize(800, 400)
-
-                layout = QtWidgets.QVBoxLayout(dialog)
-                layout.setSpacing(10)
-                layout.setContentsMargins(10, 10, 10, 10)
-
-                # Create a table to display the CSV data
-                table = QtWidgets.QTableWidget(dialog)
-                table.setRowCount(len(data))
-                table.setColumnCount(len(headers))
-                table.setHorizontalHeaderLabels(headers)
-
-                # Populate the table
-                for row_idx, row in enumerate(data):
-                    for col_idx, header in enumerate(headers):
-                        value = row[header]  # Get cell value
-                        # Handle multiline output
-                        if header == "output":
-                            value = value.replace("\\n", "\n")
-                        item = QtWidgets.QTableWidgetItem(value.strip())
-                        # Set text alignment
-                        alignment = QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
-                        item.setTextAlignment(alignment)
-
-                        # Set item flags
-                        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
-                        item.setFlags(flags)
-                        table.setItem(row_idx, col_idx, item)
-
-                # Auto-resize rows and columns to fit content
-                table.resizeColumnsToContents()
-                table.resizeRowsToContents()
-
-                # Enable word wrapping for multiline content
-                table.setWordWrap(True)
-
-                # Add size grip
-                size_grip = QtWidgets.QSizeGrip(dialog)
-                size_grip.setFixedSize(20, 20)
-
-                bottom_layout = QtWidgets.QHBoxLayout()
-                bottom_layout.addStretch()
-                bottom_layout.addWidget(size_grip)
-
-                # Add widgets to layout
-                layout.addWidget(table)
-                layout.addLayout(bottom_layout)
-
-                dialog.setLayout(layout)
-                dialog.exec_()  # Show the dialog
-
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self, "Error", f"Failed to open CSV file: {str(e)}"
-            )
-
     def save_session(self):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save Session", "", "JSON Files (*.json)"
@@ -846,12 +873,8 @@ class DeviceManager(QtWidgets.QMainWindow):
                     self, "Error", f"Failed to load session: {str(e)}"
                 )
 
-    def show_network_settings(self):
-        """Show the network settings dialog."""
-        dialog = NetworkSettingsDialog(self)
-        dialog.exec_()
-
     def save_credentials(self):
+        """Save credentials using keyring."""
         try:
             import keyring
 
@@ -889,6 +912,7 @@ class DeviceManager(QtWidgets.QMainWindow):
             )
 
     def load_credentials(self):
+        """Load credentials using keyring."""
         try:
             import keyring
 
@@ -936,142 +960,125 @@ class DeviceManager(QtWidgets.QMainWindow):
                 self, "Error", f"Failed to load credentials: {str(e)}"
             )
 
+    def save_results(self):
+        """Save results to a CSV file."""
+        if not self.results:
+            QtWidgets.QMessageBox.warning(self, "Error", "No results to save")
+            return
 
-class NetworkSettingsDialog(QtWidgets.QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Network Settings")
-        self.setMinimumWidth(400)
-        self.init_ui()
-        self.load_settings()
-
-    def init_ui(self):
-        layout = QtWidgets.QVBoxLayout(self)
-
-        # Thread Pool Settings Group
-        pool_group = QtWidgets.QGroupBox("Thread Pool Settings")
-        pool_layout = QtWidgets.QVBoxLayout()
-
-        # Maximum Threads
-        threads_layout = QtWidgets.QHBoxLayout()
-        threads_label = QtWidgets.QLabel("Maximum Threads:")
-        self.max_threads = QtWidgets.QSpinBox()
-        self.max_threads.setRange(1, 50)
-        self.max_threads.setValue(10)
-        threads_layout.addWidget(threads_label)
-        threads_layout.addWidget(self.max_threads)
-
-        # Batch Size
-        batch_layout = QtWidgets.QHBoxLayout()
-        batch_label = QtWidgets.QLabel("Batch Size:")
-        self.batch_size = QtWidgets.QSpinBox()
-        self.batch_size.setRange(1, 100)
-        self.batch_size.setValue(5)
-        batch_layout.addWidget(batch_label)
-        batch_layout.addWidget(self.batch_size)
-
-        pool_layout.addLayout(threads_layout)
-        pool_layout.addLayout(batch_layout)
-        pool_group.setLayout(pool_layout)
-
-        # Connection Timeouts Group
-        conn_group = QtWidgets.QGroupBox("Connection Timeouts")
-        conn_layout = QtWidgets.QVBoxLayout()
-
-        # SSH Check Timeout
-        ssh_layout = QtWidgets.QHBoxLayout()
-        ssh_label = QtWidgets.QLabel("SSH Check Timeout (s):")
-        self.ssh_timeout = QtWidgets.QSpinBox()
-        self.ssh_timeout.setRange(1, 10)
-        self.ssh_timeout.setValue(3)
-        ssh_layout.addWidget(ssh_label)
-        ssh_layout.addWidget(self.ssh_timeout)
-
-        # Connection Retry
-        retry_layout = QtWidgets.QHBoxLayout()
-        retry_label = QtWidgets.QLabel("Connection Retry (s):")
-        self.conn_retry = QtWidgets.QSpinBox()
-        self.conn_retry.setRange(5, 60)
-        self.conn_retry.setValue(30)
-        retry_layout.addWidget(retry_label)
-        retry_layout.addWidget(self.conn_retry)
-
-        conn_layout.addLayout(ssh_layout)
-        conn_layout.addLayout(retry_layout)
-        conn_group.setLayout(conn_layout)
-
-        # Operation Timeouts Group
-        op_group = QtWidgets.QGroupBox("Operation Timeouts")
-        op_layout = QtWidgets.QVBoxLayout()
-
-        # Command Read Timeout
-        cmd_layout = QtWidgets.QHBoxLayout()
-        cmd_label = QtWidgets.QLabel("Command Read (s):")
-        self.cmd_timeout = QtWidgets.QSpinBox()
-        self.cmd_timeout.setRange(30, 300)
-        self.cmd_timeout.setValue(120)
-        cmd_layout.addWidget(cmd_label)
-        cmd_layout.addWidget(self.cmd_timeout)
-
-        # Authentication Timeout
-        auth_layout = QtWidgets.QHBoxLayout()
-        auth_label = QtWidgets.QLabel("Authentication (s):")
-        self.auth_timeout = QtWidgets.QSpinBox()
-        self.auth_timeout.setRange(5, 60)
-        self.auth_timeout.setValue(30)
-        auth_layout.addWidget(auth_label)
-        auth_layout.addWidget(self.auth_timeout)
-
-        op_layout.addLayout(cmd_layout)
-        op_layout.addLayout(auth_layout)
-        op_group.setLayout(op_layout)
-
-        # Add groups to main layout
-        layout.addWidget(pool_group)
-        layout.addWidget(conn_group)
-        layout.addWidget(op_group)
-
-        # Buttons
-        button_box = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Results", "", "CSV Files (*.csv)"
         )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
 
-        self.setLayout(layout)
+        if filename:
+            try:
+                with open(filename, "w", encoding="utf-8", newline="") as f:
+                    writer = csv.DictWriter(
+                        f,
+                        fieldnames=[
+                            "timestamp",
+                            "username",
+                            "host",
+                            "command",
+                            "output",
+                        ],
+                    )
+                    writer.writeheader()
+                    writer.writerows(self.results)
 
-    def load_settings(self):
-        """Load saved network settings."""
+                QtWidgets.QMessageBox.information(
+                    self, "Success", "Results saved successfully"
+                )
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    self, "Error", f"Failed to save results: {str(e)}"
+                )
+
+    def view_results(self):
+        """Display the results CSV in a properly formatted table."""
         try:
-            if os.path.exists("network_settings.json"):
-                with open("network_settings.json", "r") as f:
-                    settings = json.load(f)
-                    self.ssh_timeout.setValue(settings.get("ssh_timeout", 3))
-                    self.conn_retry.setValue(settings.get("conn_retry", 30))
-                    self.cmd_timeout.setValue(settings.get("cmd_timeout", 120))
-                    self.auth_timeout.setValue(settings.get("auth_timeout", 30))
-                    self.max_threads.setValue(settings.get("max_threads", 10))
-                    self.batch_size.setValue(settings.get("batch_size", 5))
-        except Exception as e:
-            print(f"Error loading settings: {e}")
+            # Increase CSV field size limit to 10MB
+            csv.field_size_limit(10 * 1024 * 1024)  # 10MB in bytes
 
-    def accept(self):
-        """Save settings when OK is clicked."""
-        settings = {
-            "ssh_timeout": self.ssh_timeout.value(),
-            "conn_retry": self.conn_retry.value(),
-            "cmd_timeout": self.cmd_timeout.value(),
-            "auth_timeout": self.auth_timeout.value(),
-            "max_threads": self.max_threads.value(),
-            "batch_size": self.batch_size.value(),
-        }
-        try:
-            with open("network_settings.json", "w") as f:
-                json.dump(settings, f, indent=2)
+            # Path to the CSV file
+            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Open Results File", "", "CSV Files (*.csv)"
+            )
+
+            if filename:  # Check if the user selected a file
+                # Read the CSV content
+                with open(filename, "r", encoding="utf-8") as file:
+                    reader = csv.DictReader(file)
+                    headers = reader.fieldnames  # Get headers
+                    data = [row for row in reader]  # Read rows as dictionaries
+
+                # Create a dialog window
+                dialog = QtWidgets.QDialog(self)
+                dialog.setWindowTitle("View Results")
+                dialog.setGeometry(100, 100, 1000, 600)
+                dialog.setMinimumSize(800, 400)
+
+                layout = QtWidgets.QVBoxLayout(dialog)
+                layout.setSpacing(10)
+                layout.setContentsMargins(10, 10, 10, 10)
+
+                # Create a table to display the CSV data
+                table = QtWidgets.QTableWidget(dialog)
+                table.setRowCount(len(data))
+                table.setColumnCount(len(headers))
+                table.setHorizontalHeaderLabels(headers)
+
+                # Populate the table
+                for row_idx, row in enumerate(data):
+                    for col_idx, header in enumerate(headers):
+                        value = row[header]  # Get cell value
+                        # Handle multiline output
+                        if header == "output":
+                            value = value.replace("\\n", "\n")
+                        item = QtWidgets.QTableWidgetItem(value.strip())
+                        # Set text alignment
+                        alignment = QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop
+                        item.setTextAlignment(alignment)
+
+                        # Set item flags
+                        flags = (
+                            QtCore.Qt.ItemFlag.ItemIsSelectable | 
+                            QtCore.Qt.ItemFlag.ItemIsEnabled
+                        )
+                        item.setFlags(flags)
+                        table.setItem(row_idx, col_idx, item)
+
+                # Auto-resize rows and columns to fit content
+                table.resizeColumnsToContents()
+                table.resizeRowsToContents()
+
+                # Enable word wrapping for multiline content
+                table.setWordWrap(True)
+
+                # Add size grip
+                size_grip = QtWidgets.QSizeGrip(dialog)
+                size_grip.setFixedSize(20, 20)
+
+                bottom_layout = QtWidgets.QHBoxLayout()
+                bottom_layout.addStretch()
+                bottom_layout.addWidget(size_grip)
+
+                # Add widgets to layout
+                layout.addWidget(table)
+                layout.addLayout(bottom_layout)
+
+                dialog.setLayout(layout)
+                dialog.exec()  # Show the dialog
+
         except Exception as e:
-            print(f"Error saving settings: {e}")
-        super().accept()
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"Failed to open CSV file: {str(e)}"
+            )
+
+    def show_network_settings(self):
+        """Show the network settings dialog."""
+        dialog = NetworkSettingsDialog(self)
+        dialog.exec()
 
 
 if __name__ == "__main__":
@@ -1089,4 +1096,4 @@ if __name__ == "__main__":
     # Initialize and show the main window
     window = DeviceManager()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
