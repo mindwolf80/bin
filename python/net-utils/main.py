@@ -181,10 +181,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.pixel_ratio = QtWidgets.QApplication.instance().devicePixelRatio()
         # Base sizes that will be scaled
         self.base_sizes = {
-            "window_width": 1000,
-            "window_height": 800,
-            "min_width": 800,
-            "min_height": 600,
+            "window_width": 800,
+            "window_height": 600,
+            "min_width": 640,
+            "min_height": 480,
             "sidebar_width": 300,
             "font_size": 15,
             "padding": 10,
