@@ -107,14 +107,7 @@ class NetmikoWorker(QtCore.QThread):
     # Common error patterns and prompts as class variables
     _ERROR_PATTERNS = {
         "% Invalid input detected",
-        "Invalid command",
-        "-ash: invalid",
-        "not found",
         "% Error",
-        "syntax error",
-        "unknown command",
-        "incomplete command",
-        "ambiguous command",
         "% Unknown command",
         "% Incomplete command",
         "% Ambiguous command",
@@ -606,34 +599,8 @@ class NetmikoWorker(QtCore.QThread):
 
     def is_invalid_command(self, output):
         """Check if the command output indicates an invalid command error."""
-        error_indicators = {
-            "% Invalid input detected",
-            "Invalid command",
-            "-ash: invalid",
-            "not found",
-            "% Error",
-            "syntax error",
-            "unknown command",
-            "incomplete command",
-            "ambiguous command",
-            "% Unknown command",
-            "% Incomplete command",
-            "% Ambiguous command",
-        }
-
-        # Split output into lines and check each line
-        output_lines = output.lower().splitlines()
-
-        # Check for error patterns
-        for line in output_lines:
-            if any(err in line for err in error_indicators):
-                return True
-
-        # Check for suspiciously short output that might indicate an error
-        if len(output_lines) <= 2 and output.strip():
-            return any(self._has_error_markers(line) for line in output_lines)
-
-        return False
+        # Only check for explicit Cisco-style error markers
+        return bool(output) and output.strip().startswith("%")
 
     def handle_error(self, error_type, host, error, command=None):
         """Handle errors and emit appropriate signals."""
