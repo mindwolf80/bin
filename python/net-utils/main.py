@@ -544,6 +544,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.stop_btn.clicked.connect(self.stop_execution)
 
     def handle_output(self, username, host, command, output):
+        # Store result in the same format for CSV
         result = {
             "username": username,
             "host": host,
@@ -553,52 +554,32 @@ class DeviceManager(QtWidgets.QMainWindow):
         }
         self.results.append(result)
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Move cursor to end
         cursor = self.output_area.textCursor()
         cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         self.output_area.setTextCursor(cursor)
 
-        separator = f'<span style="color: {self.COLORS["separator"]}">{"=" * 70}</span>'
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # Display output in the same clean format as CSV
         if "CONNECTION ERROR" in command or "ERROR" in command:
-            self.output_area.append(f"\n{separator}")
-            self.output_area.append(
-                f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
-                f'<span style="color: {self.COLORS["error"]}">ERROR: {host}</span>'
-            )
-            self.output_area.append(
-                f'<span style="color: {self.COLORS["error"]}">{output}</span>'
-            )
-            self.output_area.append(separator)
+            self.output_area.append(f"[{timestamp}] {host}: {output}")
         else:
-            self.output_area.append(f"\n{separator}")
-            # Timestamp and connection status
-            self.output_area.append(
-                f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
-                f'<span style="color: {self.COLORS["success"]}">Connected</span>'
-            )
-            self.output_area.append(
-                f'<span style="color: {self.COLORS["success"]}">to {host} as {username}</span>'
-            )
-            # Command with blue color
-            self.output_area.append(
-                f'\n<span style="color: {self.COLORS["command"]}">$ {command}</span>'
-            )
-            # Output in light gray
-            self.output_area.append(
-                f'<span style="color: {self.COLORS["output"]}">{output}</span>'
-            )
-            self.output_area.append(separator)
+            # First line shows timestamp, host, and command
+            self.output_area.append(f"[{timestamp}] {host}: {command}")
+            # Then show the command output
+            self.output_area.append(f"{output}")
+        # Add a newline for separation
+        self.output_area.append("")
 
     def handle_progress(self, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = self.output_area.textCursor()
         cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
         self.output_area.setTextCursor(cursor)
-        # Format progress messages with timestamp in gray
-        self.output_area.append(
-            f'\n<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span>\n{message}'
-        )
+        # Format progress messages in clean format
+        self.output_area.append(f"[{timestamp}] {message}")
+        self.output_area.append("")
 
     def update_progress(self):
         """Update progress bar when a command is completed."""
@@ -616,11 +597,9 @@ class DeviceManager(QtWidgets.QMainWindow):
         username = self.username_input.text().strip()
         password = self.password_input.text().strip()
         if not username or not password:
-            error_msg = (
-                f'\n<span style="color: {self.COLORS["error"]}">'
-                f"[ERROR] Please enter username and password</span>"
-            )
-            self.output_area.append(error_msg)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.output_area.append(f"[{timestamp}] ERROR: Please enter username and password")
+            self.output_area.append("")
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter username and password"
             )
@@ -629,11 +608,9 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Validate devices
         devices_text = self.devices_input.toPlainText().strip()
         if not devices_text:
-            error_msg = (
-                f'\n<span style="color: {self.COLORS["error"]}">'
-                f"[ERROR] Please enter at least one device</span>"
-            )
-            self.output_area.append(error_msg)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.output_area.append(f"[{timestamp}] ERROR: Please enter at least one device")
+            self.output_area.append("")
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter at least one device"
             )
@@ -642,22 +619,18 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Parse and validate devices
         devices = [d.strip() for d in devices_text.split("\n") if d.strip()]
         if not devices:
-            error_msg = (
-                f'\n<span style="color: {self.COLORS["error"]}">'
-                f"[ERROR] No valid devices found</span>"
-            )
-            self.output_area.append(error_msg)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.output_area.append(f"[{timestamp}] ERROR: No valid devices found")
+            self.output_area.append("")
             QtWidgets.QMessageBox.warning(self, "Error", "No valid devices found")
             return
 
         # Validate commands
         commands_text = self.commands_input.toPlainText().strip()
         if not commands_text:
-            error_msg = (
-                f'\n<span style="color: {self.COLORS["error"]}">'
-                f"[ERROR] Please enter at least one command</span>"
-            )
-            self.output_area.append(error_msg)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.output_area.append(f"[{timestamp}] ERROR: Please enter at least one command")
+            self.output_area.append("")
             QtWidgets.QMessageBox.warning(
                 self, "Error", "Please enter at least one command"
             )
@@ -666,11 +639,9 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Parse and validate commands
         commands = [c.strip() for c in commands_text.split("\n") if c.strip()]
         if not commands:
-            error_msg = (
-                f'\n<span style="color: {self.COLORS["error"]}">'
-                f"[ERROR] No valid commands found</span>"
-            )
-            self.output_area.append(error_msg)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.output_area.append(f"[{timestamp}] ERROR: No valid commands found")
+            self.output_area.append("")
             QtWidgets.QMessageBox.warning(self, "Error", "No valid commands found")
             return
 
@@ -681,14 +652,9 @@ class DeviceManager(QtWidgets.QMainWindow):
         # Show start message
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         mode_str = "Configuration" if self.is_config_mode else "Normal"
-        start_msg = (
-            f'<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
-            f'Starting execution in <span style="color: {self.COLORS["command"]}">'
-            f"{mode_str} Mode</span>...\n"
-            f'<span style="color: {self.COLORS["success"]}">Devices: {len(devices)}, '
-            f"Commands: {len(commands)}</span>"
-        )
-        self.output_area.append(start_msg)
+        self.output_area.append(f"[{timestamp}] Starting execution in {mode_str} Mode")
+        self.output_area.append(f"Devices: {len(devices)}, Commands: {len(commands)}")
+        self.output_area.append("")
 
         # Initialize progress tracking
         self.completed_commands = 0
@@ -747,10 +713,8 @@ class DeviceManager(QtWidgets.QMainWindow):
             self.stop_btn.setEnabled(False)  # Disable Stop button
             self.progress_bar.hide()
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.output_area.append(
-                f'\n<span style="color: {self.COLORS["timestamp"]}">[{ts}]</span> '
-                f'<span style="color: {self.COLORS["success"]}">Done</span>'
-            )
+            self.output_area.append(f"[{ts}] Done")
+            self.output_area.append("")
 
     def toggle_pause(self):
         """Toggle the pause state of the workers."""
@@ -804,10 +768,8 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.progress_bar.hide()
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.output_area.append(
-            f'\n<span style="color: {self.COLORS["timestamp"]}">[{timestamp}]</span> '
-            f'<span style="color: {self.COLORS["error"]}">Execution stopped by user</span>'
-        )
+        self.output_area.append(f"[{timestamp}] Execution stopped by user")
+        self.output_area.append("")
 
     def clear_output(self):
         self.output_area.clear()
@@ -815,32 +777,61 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.progress_bar.hide()
 
     def save_session(self):
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Session", "", "JSON Files (*.json)"
-        )
+        """Save the current session state to a JSON file."""
+        try:
+            # Create default filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"netmate_session_{timestamp}.json"
+            
+            filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save Session", default_filename, "JSON Files (*.json)"
+            )
 
-        if filename:
-            try:
+            if filename:
+                # Get current session state
                 session = {
                     "username": self.username_input.text(),
+                    "password": self.password_input.text(),
                     "device_type": self.device_type.currentText(),
                     "devices": self.devices_input.toPlainText(),
                     "commands": self.commands_input.toPlainText(),
                     "is_config_mode": self.is_config_mode,
+                    "output": self.output_area.toPlainText(),
+                    "results": self.results,
+                    "completed_commands": self.completed_commands,
+                    "total_commands": self.total_commands,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
 
-                with open(filename, "w", encoding="utf-8") as f:
-                    json.dump(session, f, indent=2)
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
 
+                # Save to file with proper encoding
+                with open(filename, "w", encoding="utf-8") as f:
+                    json.dump(session, f, indent=2, ensure_ascii=False)
+
+                # Show success message with file path
                 QtWidgets.QMessageBox.information(
-                    self, "Success", "Session saved successfully"
+                    self, 
+                    "Success", 
+                    f"Session saved successfully to:\n{filename}"
                 )
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(
-                    self, "Error", f"Failed to save session: {str(e)}"
-                )
+                
+                # Open the containing folder
+                if sys.platform == 'darwin':  # macOS
+                    os.system(f'open -R "{filename}"')
+                elif sys.platform == 'linux':  # Linux
+                    os.system(f'xdg-open "{os.path.dirname(filename)}"')
+                else:  # Windows
+                    os.system(f'explorer /select,"{filename}"')
+                    
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"Failed to save session: {str(e)}"
+            )
 
     def load_session(self):
+        """Load a previously saved session state from a JSON file."""
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load Session", "", "JSON Files (*.json)"
         )
@@ -850,23 +841,40 @@ class DeviceManager(QtWidgets.QMainWindow):
                 with open(filename, "r", encoding="utf-8") as f:
                     session = json.load(f)
 
+                # Restore session state
                 self.username_input.setText(session.get("username", ""))
+                self.password_input.setText(session.get("password", ""))
                 self.devices_input.setPlainText(session.get("devices", ""))
                 self.commands_input.setPlainText(session.get("commands", ""))
 
+                # Restore device type
                 device_type = session.get("device_type")
                 if device_type:
                     index = self.device_type.findText(device_type)
                     if index >= 0:
                         self.device_type.setCurrentIndex(index)
 
-                # Load config mode state
+                # Restore config mode state
                 is_config_mode = session.get("is_config_mode", False)
                 self.toggle_config_mode_action.setChecked(is_config_mode)
                 self.toggle_config_mode()
 
+                # Restore output and results if available
+                if "output" in session:
+                    self.output_area.setPlainText(session["output"])
+                if "results" in session:
+                    self.results = session["results"]
+                if "completed_commands" in session:
+                    self.completed_commands = session["completed_commands"]
+                if "total_commands" in session:
+                    self.total_commands = session["total_commands"]
+
+                # Show success message with session timestamp
+                timestamp = session.get("timestamp", "Unknown")
                 QtWidgets.QMessageBox.information(
-                    self, "Success", "Session loaded successfully"
+                    self, 
+                    "Success", 
+                    f"Session from {timestamp} loaded successfully"
                 )
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
@@ -966,12 +974,20 @@ class DeviceManager(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Error", "No results to save")
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Results", "", "CSV Files (*.csv)"
-        )
+        try:
+            # Create default filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"netmate_results_{timestamp}.csv"
+            
+            filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save Results", default_filename, "CSV Files (*.csv)"
+            )
 
-        if filename:
-            try:
+            if filename:
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+
+                # Save to file with proper encoding
                 with open(filename, "w", encoding="utf-8", newline="") as f:
                     writer = csv.DictWriter(
                         f,
@@ -986,13 +1002,25 @@ class DeviceManager(QtWidgets.QMainWindow):
                     writer.writeheader()
                     writer.writerows(self.results)
 
+                # Show success message with file path
                 QtWidgets.QMessageBox.information(
-                    self, "Success", "Results saved successfully"
+                    self, 
+                    "Success", 
+                    f"Results saved successfully to:\n{filename}"
                 )
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(
-                    self, "Error", f"Failed to save results: {str(e)}"
-                )
+                
+                # Open the containing folder
+                if sys.platform == 'darwin':  # macOS
+                    os.system(f'open -R "{filename}"')
+                elif sys.platform == 'linux':  # Linux
+                    os.system(f'xdg-open "{os.path.dirname(filename)}"')
+                else:  # Windows
+                    os.system(f'explorer /select,"{filename}"')
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"Failed to save results: {str(e)}"
+            )
 
     def view_results(self):
         """Display the results CSV in a properly formatted table."""
