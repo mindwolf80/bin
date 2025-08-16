@@ -1,0 +1,5 @@
+# ignore image tarballs and local outputs
+netops-alpine-*.tar
+data/outputs/
+*.log
+.DS_Store
