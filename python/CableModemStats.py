@@ -24,8 +24,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # CONFIGURATION
 MODEM_IP = "192.168.100.1"
-USER = "admin"
-PASS = "Arris_8200"
+USER = "username"
+PASS = "password"
 DEBUG = False  # Set to True to save HTML for debugging
 
 def get_modem_stats():
@@ -305,3 +305,4 @@ if __name__ == "__main__":
                 print(f"{channel:<4} {ch_id:<6} {status:<8} {ch_type:<18} {freq:<12} {width:<12} {power:<10}")
         
         print(f"{'='*80}\n")
+
