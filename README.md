@@ -48,3 +48,7 @@ pip install -r requirements.txt
 ## Prebuilt Binaries
 
 Compiled executables (e.g. `NetMate-1.2.1.exe`, `YouTubeTranscriptExtractor`) are distributed through [GitHub Releases](https://github.com/mindwolf80/bin/releases) rather than committed to source.
+
+## License
+
+Released under the [MIT License](LICENSE). Third-party binaries (e.g. the OpenWrt firmware package) remain under their original licenses.
