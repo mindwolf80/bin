@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Build output (PyInstaller, etc.) — publish binaries via GitHub Releases
+build/
+dist/
+*.exe
+!network-diagnostics/ip-connectivity-tester/TNCGE.exe
+
+# Runtime output
+*.log
+modem_history.csv
+debug_*.html
+
+# Secrets
+.env
+*.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,4 +1,4 @@
-﻿from netmiko import ConnectHandler
+from netmiko import ConnectHandler
 device = {
     "device_type": "cisco_ios",
     "host": "10.0.0.1",
