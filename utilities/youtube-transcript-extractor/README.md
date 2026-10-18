@@ -22,4 +22,4 @@ pip install pyinstaller
 pyinstaller --onefile --windowed --icon extract.ico --name YouTubeTranscriptExtractor yt_transcript_fetcher.py
 ```
 
-Publish the output from `dist/` as a GitHub Release asset.
+Output: `dist/YouTubeTranscriptExtractor`.

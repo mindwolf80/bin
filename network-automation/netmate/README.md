@@ -129,4 +129,4 @@ pip install pyinstaller
 pyinstaller NetMate-1.2.1.spec
 ```
 
-Publish `dist/NetMate-1.2.1.exe` as a GitHub Release asset.
+Output: `dist/NetMate-1.2.1.exe`.

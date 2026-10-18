@@ -6,7 +6,7 @@ venv/
 env/
 *.egg-info/
 
-# Build output (PyInstaller, etc.) — publish binaries via GitHub Releases
+# Build output (PyInstaller, etc.)
 build/
 dist/
 *.exe
