@@ -18,12 +18,12 @@ A Python-based network automation tool with a GUI interface for executing comman
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.9+ (PyQt6 requirement)
 - See requirements.txt for detailed dependencies
 
 ## Installation
 
-1. Clone the repository
+1. Clone the repository and change to `network-automation/netmate`
 2. Install dependencies:
 ```bash
 pip install -r requirements.txt
@@ -121,3 +121,12 @@ python main.py
 - Larger batch sizes reduce overhead but increase memory usage
 - Network stability and device response times should guide your settings
 - Monitor system performance and adjust settings accordingly
+
+## Building
+
+```bash
+pip install pyinstaller
+pyinstaller NetMate-1.2.1.spec
+```
+
+Publish `dist/NetMate-1.2.1.exe` as a GitHub Release asset.
