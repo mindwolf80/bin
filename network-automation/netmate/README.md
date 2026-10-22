@@ -1,11 +1,11 @@
 # NetMate
 
-A Python-based network automation tool with a GUI interface for executing commands across multiple network devices simultaneously, featuring thread pooling for optimized performance.
+A Python-based network automation tool with a GUI interface for executing commands across multiple network devices simultaneously.
 
 ## Features
 
-- Execute commands on multiple network devices in parallel using thread pooling
-- Configurable batch processing for efficient resource management
+- Execute commands on multiple network devices in parallel (configurable concurrency)
+- Per-platform detection of rejected commands
 - Support for various network device types (Cisco, Arista, Juniper, etc.)
 - Configuration and normal operation modes
 - Secure credential management
@@ -43,14 +43,15 @@ python main.py
 
 ## Performance Optimization
 
-### Thread Pool Settings
-- Configure maximum concurrent threads (1-50)
-- Set batch size for device processing (1-100)
+### Concurrency
+- Configure the number of devices processed concurrently (1-50)
+- A new device starts as soon as any running device finishes
+- Commands on a single device always run in order over one SSH session
 - Access via Preferences > Network Settings
 
 ### Recommended Settings
-- For stable networks: 10-20 threads, batch size 5-10
-- For less stable networks: 5-10 threads, batch size 3-5
+- For stable networks: 10-20 concurrent devices
+- For less stable networks: 5-10 concurrent devices
 - Adjust based on:
   * Network stability
   * Device response times
@@ -60,11 +61,12 @@ python main.py
 ## Modes
 
 - **Normal Mode**: Each command is executed separately
-- **Config Mode**: Commands are executed as a configuration set
+- **Config Mode**: Commands are executed as a configuration set. On commit-based platforms (Juniper JunOS, Palo Alto PAN-OS, IOS-XR) the set is committed when no errors are detected; on JunOS a rejected set is rolled back with `rollback 0`. Configuration is not saved to startup-config on other platforms.
 
 ## Features Guide
 
 ### Credential Management
+- Passwords are never written to session files
 - Save credentials securely using system keyring
 - Load previously saved credentials from dropdown
 
@@ -84,7 +86,7 @@ python main.py
 - Batch-wise progress tracking
 
 ### Network Settings
-- Thread pool configuration
+- Concurrency
 - Connection timeouts
 - SSH settings
 - Operation timeouts
@@ -107,9 +109,8 @@ python main.py
 ## Tips
 
 - Use Configuration Mode for related commands that need to be executed as a set
-- Adjust thread pool settings based on network and system capabilities
-- Start with conservative thread/batch settings and increase gradually
-- Monitor system resource usage when adjusting thread pool settings
+- Adjust concurrency based on network and system capabilities
+- Start with conservative concurrency and increase gradually
 - Save credentials for frequently used accounts
 - Save sessions for common device groups and command sets
 - Monitor execution progress in real-time
@@ -117,10 +118,25 @@ python main.py
 
 ## Performance Considerations
 
-- Higher thread counts provide better parallelization but consume more system resources
-- Larger batch sizes reduce overhead but increase memory usage
+- Higher concurrency finishes large runs faster but opens more simultaneous SSH sessions
+- Authentication failures are not retried (avoids account lockouts); connection timeouts are retried with backoff
 - Network stability and device response times should guide your settings
 - Monitor system performance and adjust settings accordingly
+
+## Architecture
+
+- `engine.py`: GUI-independent execution engine. Emits structured `Event` objects through a callback; usable from Qt, a web backend or a CLI.
+- `handlers.py`: Qt bridge that runs the engine on a `QThread` and re-emits events as signals.
+- `main.py`: PyQt6 GUI.
+
+## Tests
+
+```bash
+pip install pytest
+python -m pytest tests
+```
+
+Tests use a fake Netmiko connection; no network devices are required.
 
 ## Building
 

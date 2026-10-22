@@ -31,30 +31,20 @@ class NetworkSettingsDialog(QtWidgets.QDialog):
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
 
-        # Thread Pool Settings Group
-        pool_group = QtWidgets.QGroupBox("Thread Pool Settings")
+        # Concurrency Settings Group
+        pool_group = QtWidgets.QGroupBox("Concurrency")
         pool_layout = QtWidgets.QVBoxLayout()
 
-        # Maximum Threads
+        # Maximum concurrent devices
         threads_layout = QtWidgets.QHBoxLayout()
-        threads_label = QtWidgets.QLabel("Maximum Threads:")
+        threads_label = QtWidgets.QLabel("Concurrent Devices:")
         self.max_threads = QtWidgets.QSpinBox()
         self.max_threads.setRange(1, 50)
         self.max_threads.setValue(10)
         threads_layout.addWidget(threads_label)
         threads_layout.addWidget(self.max_threads)
 
-        # Batch Size
-        batch_layout = QtWidgets.QHBoxLayout()
-        batch_label = QtWidgets.QLabel("Batch Size:")
-        self.batch_size = QtWidgets.QSpinBox()
-        self.batch_size.setRange(1, 100)
-        self.batch_size.setValue(5)
-        batch_layout.addWidget(batch_label)
-        batch_layout.addWidget(self.batch_size)
-
         pool_layout.addLayout(threads_layout)
-        pool_layout.addLayout(batch_layout)
         pool_group.setLayout(pool_layout)
 
         # Connection Timeouts Group
@@ -63,7 +53,7 @@ class NetworkSettingsDialog(QtWidgets.QDialog):
 
         # SSH Check Timeout
         ssh_layout = QtWidgets.QHBoxLayout()
-        ssh_label = QtWidgets.QLabel("SSH Check Timeout (s):")
+        ssh_label = QtWidgets.QLabel("SSH Connect Timeout (s):")
         self.ssh_timeout = QtWidgets.QSpinBox()
         self.ssh_timeout.setRange(1, 10)
         self.ssh_timeout.setValue(3)
@@ -136,7 +126,6 @@ class NetworkSettingsDialog(QtWidgets.QDialog):
                     self.cmd_timeout.setValue(settings.get("cmd_timeout", 120))
                     self.auth_timeout.setValue(settings.get("auth_timeout", 30))
                     self.max_threads.setValue(settings.get("max_threads", 10))
-                    self.batch_size.setValue(settings.get("batch_size", 5))
         except Exception as e:
             print(f"Error loading settings: {e}")
 
@@ -148,7 +137,6 @@ class NetworkSettingsDialog(QtWidgets.QDialog):
             "cmd_timeout": self.cmd_timeout.value(),
             "auth_timeout": self.auth_timeout.value(),
             "max_threads": self.max_threads.value(),
-            "batch_size": self.batch_size.value(),
         }
         try:
             with open("network_settings.json", "w") as f:
@@ -562,7 +550,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Display output in the same clean format as CSV
-        if "CONNECTION ERROR" in command or "ERROR" in command:
+        if "ERROR" in command or command == "STOPPED":
             self.output_area.append(f"[{timestamp}] {host}: {output}")
         else:
             # First line shows timestamp, host, and command
@@ -581,11 +569,10 @@ class DeviceManager(QtWidgets.QMainWindow):
         self.output_area.append(f"[{timestamp}] {message}")
         self.output_area.append("")
 
-    def update_progress(self):
-        """Update progress bar when a command is completed."""
-        self.completed_commands += 1
+    def advance_progress(self, steps):
+        """Advance the progress bar by completed (or skipped) steps."""
+        self.completed_commands += steps
         self.progress_bar.setValue(self.completed_commands)
-        # Update progress text
         percent = int((self.completed_commands / self.total_commands) * 100)
         progress_text = (
             f"{percent}% ({self.completed_commands}/{self.total_commands} commands)"
@@ -662,7 +649,7 @@ class DeviceManager(QtWidgets.QMainWindow):
         cmd_multiplier = 1 if self.is_config_mode else len(commands)
         self.total_commands = len(devices) * cmd_multiplier
 
-        # Configure progress bar
+        # Configure progress bar (one step per command, or per device in config mode)
         self.progress_bar.setMaximum(self.total_commands)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p% (%v/%m commands)")
@@ -686,22 +673,11 @@ class DeviceManager(QtWidgets.QMainWindow):
         worker = NetmikoWorker(devices_info, commands, self.is_config_mode)
         worker.output_ready.connect(self.handle_output)
         worker.progress_update.connect(self.handle_progress)
-        worker.command_completed.connect(self.update_progress)
-        worker.batch_completed.connect(self.handle_batch_completed)
+        worker.progress_advanced.connect(self.advance_progress)
         worker.finished.connect(lambda w=worker: self.handle_worker_finished(w))
         self.workers.append(worker)
         worker.start()
 
-    def handle_batch_completed(self, completed_count):
-        """Handle completion of a device batch."""
-        self.completed_commands += completed_count
-        self.progress_bar.setValue(self.completed_commands)
-        # Update progress text
-        percent = int((self.completed_commands / self.total_commands) * 100)
-        progress_text = (
-            f"{percent}% ({self.completed_commands}/{self.total_commands} commands)"
-        )
-        self.progress_bar.setFormat(progress_text)
 
     def handle_worker_finished(self, worker):
         if worker in self.workers:
@@ -791,7 +767,6 @@ class DeviceManager(QtWidgets.QMainWindow):
                 # Get current session state
                 session = {
                     "username": self.username_input.text(),
-                    "password": self.password_input.text(),
                     "device_type": self.device_type.currentText(),
                     "devices": self.devices_input.toPlainText(),
                     "commands": self.commands_input.toPlainText(),
@@ -843,7 +818,9 @@ class DeviceManager(QtWidgets.QMainWindow):
 
                 # Restore session state
                 self.username_input.setText(session.get("username", ""))
-                self.password_input.setText(session.get("password", ""))
+                # Passwords are not stored in sessions; use saved credentials.
+                if session.get("password"):
+                    self.password_input.setText(session["password"])
                 self.devices_input.setPlainText(session.get("devices", ""))
                 self.commands_input.setPlainText(session.get("commands", ""))
 
