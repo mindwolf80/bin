@@ -55,6 +55,15 @@ class Device:
             return "% Invalid input detected at '^' marker."
         return f"{self.host}: {command} ok\nsecond line"
 
+    def send_config_set(self, commands: list[str], **_kw: Any) -> str:
+        return "\n".join(f"{self.host}(config)# {c}" for c in commands)
+
+    def commit(self) -> str:
+        return "commit complete"
+
+    def exit_config_mode(self) -> str:
+        return ""
+
     def disconnect(self) -> None:
         pass
 
@@ -279,11 +288,12 @@ def test_session_round_trip(
     window.toggle_config_mode_action.trigger()
     window.run_btn.click()
     finish(qtbot, window)
+    assert [r.status for r in window.results] == ["OK", "OK"]  # one config set per device
     path = tmp_path / "s.json"
     dialogs.save_path = str(path)
     window.save_session()
     assert "secret" not in path.read_text(encoding="utf-8")
-    assert dialogs.opened_urls == [str(tmp_path)]
+    assert [Path(u) for u in dialogs.opened_urls] == [tmp_path]
 
     fresh = main.DeviceManager()
     qtbot.addWidget(fresh)
