@@ -29,7 +29,7 @@ QLabel[text="Output:"] {
 }
 
 /* Input Fields */
-QLineEdit, QComboBox, QTextEdit {
+QLineEdit, QComboBox, QTextEdit, QPlainTextEdit {
     background-color: #334155; /* Darker gray background */
     color: #e2e8f0; /* Light text */
     border: 1px solid #475569; /* Slight border for separation */
@@ -70,7 +70,7 @@ QComboBox QAbstractItemView {
     outline: none;
 }
 
-QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
+QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QPlainTextEdit:focus {
     border: 1px solid #3b82f6; /* Blue border on focus */
     outline: none;
 }
@@ -260,7 +260,7 @@ QScrollBar::handle:vertical {
 }
 
 /* Output Area */
-QTextEdit {
+QTextEdit, QPlainTextEdit {
     background-color: #1e293b;
     color: #e2e8f0;
     border: 1px solid #475569;
@@ -292,4 +292,62 @@ QSplitter::handle:hover {
 
 QSplitter::handle:pressed {
     background-color: #475569; /* Even darker when pressed */
+}
+
+/* Output / results / log tables */
+QTableView#results_table {
+    background-color: #0f172a;
+    alternate-background-color: #16213a;
+    color: #cbd5e1;
+    gridline-color: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    font-size: 13px;
+    selection-background-color: #1d4ed8;
+    selection-color: #f8fafc;
+}
+
+QHeaderView::section {
+    background-color: #334155;
+    color: #d4b598;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: none;
+    border-right: 1px solid #1e293b;
+    border-bottom: 1px solid #475569;
+}
+
+QTableCornerButton::section {
+    background-color: #334155;
+    border: none;
+}
+
+QPlainTextEdit#detail_pane {
+    background-color: #0b1220;
+    color: #e2e8f0;
+    font-size: 13px;
+    padding: 8px;
+}
+
+QLabel#table_summary {
+    font-size: 13px;
+    margin: 0 4px;
+}
+
+QStatusBar {
+    background-color: #1e293b;
+    color: #94a3b8;
+}
+
+QScrollBar:horizontal {
+    background: #1e293b;
+    height: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #475569;
+    min-width: 24px;
+    border-radius: 6px;
 }

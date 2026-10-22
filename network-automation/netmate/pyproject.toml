@@ -1,0 +1,88 @@
+[project]
+name = "netmate"
+version = "1.3.0"
+description = "Run commands across many network devices in parallel with Netmiko."
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "PyQt6>=6.7.0",
+    "netmiko>=4.6.0",
+    "keyring>=25.0.0",
+    "paramiko>=5.0.0",
+    "cryptography>=50.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+    "ruff>=0.6",
+    "pyright>=1.1.380",
+    "types-paramiko",
+]
+
+# ---------------------------------------------------------------- Ruff
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["*.spec"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "A",        # builtins shadowing
+    "C4",       # comprehensions
+    "SIM",      # simplify
+    "RET",      # return
+    "PIE",
+    "PTH",      # pathlib
+    "BLE",      # blind except
+    "S",        # bandit
+    "G",        # logging format
+    "LOG",
+    "PERF",
+    "PL",       # pylint
+    "RUF",
+]
+ignore = [
+    "PLR0913",  # too many arguments: Engine/Event constructors are explicit by design
+    "PLR2004",  # magic values in comparisons
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLR2004", "N802"]
+# Qt overrides use camelCase names fixed by the framework.
+"main.py" = ["N802"]
+"table_widgets.py" = ["N802"]
+
+[tool.ruff.lint.pylint]
+max-statements = 80
+max-branches = 15
+
+# ---------------------------------------------------------------- Pyright / Pylance
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+exclude = [".venv", "build", "dist", "**/__pycache__"]
+reportMissingTypeStubs = false
+# PyQt6's stubs leave signal.connect() and a few list parameters untyped; every
+# other "unknown type" rule stays on, so gaps in our own code are still errors.
+reportUnknownMemberType = false
+reportUnnecessaryTypeIgnoreComment = "error"
+
+# ---------------------------------------------------------------- Pytest
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["integration: real SSH sessions against a local fake IOS server"]
+filterwarnings = ["error", "ignore::DeprecationWarning:paramiko.*", "ignore::cryptography.utils.CryptographyDeprecationWarning"]

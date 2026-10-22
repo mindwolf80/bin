@@ -11,22 +11,25 @@ A Python-based network automation tool with a GUI interface for executing comman
 - Secure credential management
 - Session saving and loading
 - Progress tracking and execution control
-- Command output logging
+- Live results table: colour-coded status per command, search, status filters and a full-output detail pane
+- Structured, size-rotated application log with a tabular log viewer
 - Results export to CSV
 - Pause/Resume functionality
 - Dark mode support via QSS styling
 
 ## Requirements
 
-- Python 3.9+ (PyQt6 requirement)
+- Python 3.10+
+- Linux on X11 only: the `libxcb-cursor0` system package (Qt 6.5+ requirement). NetMate checks
+  for it at startup and prints the install command if it is missing.
 - See requirements.txt for detailed dependencies
 
 ## Installation
 
 1. Clone the repository and change to `network-automation/netmate`
-2. Install dependencies:
+2. Install dependencies (exact tested versions; use `requirements.txt` for the minimum ranges):
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.lock
 ```
 
 ## Usage
@@ -75,9 +78,11 @@ python main.py
 - Load previous sessions
 
 ### Results
-- View command execution results in real-time
-- Export results to CSV
-- View saved results in tabulated format
+- Every command result and progress event is a row in the Output table: Time, Status, Host, User, Command, Output
+- Status is colour-coded (OK, FAILED, ERROR, STOPPED, CONNECTED, INFO); failed rows are tinted
+- Filter by *Command results*, *Problems only* or *Progress messages*, or search across all columns
+- Select a row to see the complete device output in the monospace detail pane
+- Export results to CSV (includes a `status` column); *View Results* opens a CSV in the same table
 
 ### Execution Control
 - Pause/Resume command execution
@@ -92,9 +97,9 @@ python main.py
 - Operation timeouts
 
 ### Logging
-- View detailed execution logs
-- Clear logs when needed
-- Real-time progress updates
+- Written to `netmate.log`, rotated at 5 MB with 5 backups
+- Format: `time | level | source | thread | message`; tracebacks are kept with their record
+- *Log > View Log* shows the log as a table with level filter, search and detail pane
 
 ## Device Support
 
@@ -127,22 +132,28 @@ python main.py
 
 - `engine.py`: GUI-independent execution engine. Emits structured `Event` objects through a callback; usable from Qt, a web backend or a CLI.
 - `handlers.py`: Qt bridge that runs the engine on a `QThread` and re-emits events as signals.
+- `table_widgets.py`: Output, results and log tables (Qt model/view with filtering).
+- `app_logging.py`: Rotating log setup and log parser.
 - `main.py`: PyQt6 GUI.
 
-## Tests
+## Development
 
 ```bash
-pip install pytest
-python -m pytest tests
+pip install -r requirements-dev.txt
+ruff check . && ruff format --check .   # lint + format
+pyright                                 # type check (same engine as Pylance)
+python -m pytest                        # tests
 ```
 
-Tests use a fake Netmiko connection; no network devices are required.
+Ruff, Pyright/Pylance and pytest are configured in `pyproject.toml`, so the editor and CI use the same rules.
+Tests use a fake Netmiko connection; no network devices are required. GUI tests use `pytest-qt`
+(set `QT_QPA_PLATFORM=offscreen` on headless machines).
 
 ## Building
 
 ```bash
 pip install pyinstaller
-pyinstaller NetMate-1.2.1.spec
+pyinstaller NetMate-1.3.0.spec
 ```
 
-Output: `dist/NetMate-1.2.1.exe`.
+Output: `dist/NetMate-1.3.0.exe` (Windows) or `dist/NetMate-1.3.0` (Linux/macOS).
