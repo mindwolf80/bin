@@ -39,7 +39,7 @@ pip install -r requirements.lock
 python main.py
 ```
 
-2. Enter credentials and select device type
+2. Enter a username, choose *Password* or *SSH key / agent* login, and select the device type
 3. Add device IPs/hostnames (one per line)
 4. Enter commands to execute (one per line)
 5. Click "Run Commands" to start execution
@@ -67,6 +67,14 @@ python main.py
 - **Config Mode**: Commands are executed as a configuration set. On commit-based platforms (Juniper JunOS, Palo Alto PAN-OS, IOS-XR) the set is committed when no errors are detected; on JunOS a rejected set is rolled back with `rollback 0`. Configuration is not saved to startup-config on other platforms.
 
 ## Features Guide
+
+### SSH Key Login (no password)
+- Set *Login With* to **SSH key / agent**; the password field is not needed
+- *Key File* blank: uses `~/.ssh/id_ed25519`, `id_ecdsa` or `id_rsa` (first found), and ssh-agent
+- Or pick any private key with the **…** button; enter *Key Passphrase* only if the key is encrypted
+- The key and passphrase are checked before any device is contacted, so a wrong passphrase fails
+  once with a clear message instead of on every device
+- Sessions remember the login method and key path; passphrases are never saved
 
 ### Credential Management
 - Passwords are never written to session files
@@ -134,6 +142,8 @@ python main.py
 - `handlers.py`: Qt bridge that runs the engine on a `QThread` and re-emits events as signals.
 - `table_widgets.py`: Output, results and log tables (Qt model/view with filtering).
 - `app_logging.py`: Rotating log setup and log parser.
+- `auth.py`: Password / SSH key / ssh-agent login options and key validation.
+- `session.py`: Validated session files.
 - `main.py`: PyQt6 GUI.
 
 ## Development
@@ -153,7 +163,7 @@ Tests use a fake Netmiko connection; no network devices are required. GUI tests 
 
 ```bash
 pip install pyinstaller
-pyinstaller NetMate-1.3.0.spec
+pyinstaller NetMate-1.4.0.spec
 ```
 
-Output: `dist/NetMate-1.3.0.exe` (Windows) or `dist/NetMate-1.3.0` (Linux/macOS).
+Output: `dist/NetMate-1.4.0.exe` (Windows) or `dist/NetMate-1.4.0` (Linux/macOS).

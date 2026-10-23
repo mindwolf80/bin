@@ -1,4 +1,7 @@
-"""Session files: devices, commands, mode and results. Passwords are never stored."""
+"""Session files: devices, commands, mode, login method and results.
+
+Passwords and key passphrases are never stored.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from auth import AuthMethod
 from engine import now
 from table_widgets import ResultRow
 
@@ -18,6 +22,8 @@ class SessionError(ValueError):
 @dataclass
 class Session:
     username: str = ""
+    auth_method: str = AuthMethod.PASSWORD.value
+    key_file: str = ""  # path only; passphrases and passwords are never stored
     device_type: str = ""
     devices: str = ""
     commands: str = ""
@@ -30,6 +36,8 @@ class Session:
     def to_json(self) -> str:
         data = {
             "username": self.username,
+            "auth_method": self.auth_method,
+            "key_file": self.key_file,
             "device_type": self.device_type,
             "devices": self.devices,
             "commands": self.commands,
@@ -60,8 +68,14 @@ class Session:
                 raise SessionError(f"results[{i}] must be an object")
             results.append(ResultRow.from_mapping(cast("dict[str, object]", item)))
 
+        auth_method = _text(data, "auth_method") or AuthMethod.PASSWORD.value
+        if auth_method not in {m.value for m in AuthMethod}:
+            raise SessionError(f"unknown auth_method '{auth_method}'")
+
         return cls(
             username=_text(data, "username"),
+            auth_method=auth_method,
+            key_file=_text(data, "key_file"),
             device_type=_text(data, "device_type"),
             devices=_text(data, "devices"),
             commands=_text(data, "commands"),

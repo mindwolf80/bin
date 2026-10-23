@@ -10,7 +10,8 @@ from __future__ import annotations
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from pathlib import Path
 from types import TracebackType
 
 import paramiko
@@ -42,13 +43,25 @@ SESSION_SETUP = {"terminal length 0", "terminal width 511", "terminal no monitor
 
 
 class _Auth(paramiko.ServerInterface):
+    def __init__(self, authorized_keys: frozenset[str], allow_password: bool) -> None:
+        self.authorized_keys = authorized_keys  # base64 public key blobs
+        self.allow_password = allow_password
+
     def check_auth_password(self, username: str, password: str) -> int:
-        if username == USERNAME and password == PASSWORD:
+        if self.allow_password and username == USERNAME and password == PASSWORD:
+            return AUTH_SUCCESSFUL
+        return AUTH_FAILED
+
+    def check_auth_publickey(self, username: str, key: paramiko.PKey) -> int:
+        if username == USERNAME and key.get_base64() in self.authorized_keys:
             return AUTH_SUCCESSFUL
         return AUTH_FAILED
 
     def get_allowed_auths(self, username: str) -> str:
-        return "password"
+        methods = ["publickey"] if self.authorized_keys else []
+        if self.allow_password:
+            methods.append("password")
+        return ",".join(methods)
 
     def check_channel_request(self, kind: str, chanid: int) -> int:
         if kind == "session":
@@ -140,7 +153,18 @@ def _no_delay(_line: str) -> float:
 class FakeIosServer:
     """Listens on 127.0.0.1:<ephemeral>; each connection gets its own IOS shell."""
 
-    def __init__(self, delay: Callable[[str], float] | None = None) -> None:
+    def __init__(
+        self,
+        delay: Callable[[str], float] | None = None,
+        *,
+        authorized_keys: Iterable[str | Path] = (),
+        allow_password: bool = True,
+    ) -> None:
+        """`authorized_keys` are public key files (OpenSSH .pub format) allowed to log in."""
+        self.authorized_keys = frozenset(
+            Path(p).read_text(encoding="utf-8").split()[1] for p in authorized_keys
+        )
+        self.allow_password = allow_password
         self.host_key = paramiko.RSAKey.generate(2048)
         self.delay: Callable[[str], float] = delay or _no_delay
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -181,7 +205,7 @@ class FakeIosServer:
         transport = paramiko.Transport(client)
         transport.add_server_key(self.host_key)
         try:
-            transport.start_server(server=_Auth())
+            transport.start_server(server=_Auth(self.authorized_keys, self.allow_password))
             chan = transport.accept(20)
             if chan is None:
                 return

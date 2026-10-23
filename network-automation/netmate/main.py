@@ -19,13 +19,14 @@ from keyring.errors import KeyringError
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from app_logging import LOG_FILE, configure_logging
+from auth import AuthConfig, AuthError, AuthMethod
 from engine import Event, Settings, now
 from handlers import NetmikoWorker
 from session import Session, SessionError
 from table_widgets import LogViewerDialog, OutputPanel, ResultRow, Status
 
 APP_NAME = "NetMate"
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 KEYRING_SERVICE = "NetMate"
 KEYRING_INDEX = "_saved_users_"
 CSV_FIELD_LIMIT = 10 * 1024 * 1024  # device output can be large
@@ -170,36 +171,63 @@ class DeviceManager(QtWidgets.QMainWindow):
         main_layout.addWidget(self._build_content())
         self.setStatusBar(QtWidgets.QStatusBar())
 
-    def _build_sidebar(self) -> QtWidgets.QWidget:
+    def _build_sidebar(self) -> QtWidgets.QScrollArea:
         """Credentials, run controls and progress."""
         expanding_fixed = QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
         )
         sidebar_widget = QtWidgets.QWidget()
-        sidebar_widget.setFixedWidth(300)
         sidebar_widget.setObjectName("sidebar")
         sidebar_layout = QtWidgets.QVBoxLayout(sidebar_widget)
-        sidebar_layout.setSpacing(10)
-        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        sidebar_layout.setSpacing(8)
+        sidebar_layout.setContentsMargins(4, 0, 8, 0)
 
         credentials_group = QtWidgets.QGroupBox("Credentials")
         credentials_group.setObjectName("sidebar-group")
         credentials_layout = QtWidgets.QVBoxLayout(credentials_group)
         self.username_input = QtWidgets.QLineEdit()
         self.username_input.setSizePolicy(expanding_fixed)
-        self.password_input = QtWidgets.QLineEdit()
-        self.password_input.setSizePolicy(expanding_fixed)
-        self.password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.auth_method = QtWidgets.QComboBox()
+        self.auth_method.setSizePolicy(expanding_fixed)
+        self.auth_method.addItem("Password", AuthMethod.PASSWORD)
+        self.auth_method.addItem("SSH key / agent", AuthMethod.SSH_KEY)
+        self.auth_method.currentIndexChanged.connect(self._update_auth_fields)
         self.device_type = QtWidgets.QComboBox()
         self.device_type.setSizePolicy(expanding_fixed)
         self.device_type.addItems(list(DEVICE_TYPES))
-        for label, widget in (
-            ("Username:", self.username_input),
-            ("Password:", self.password_input),
-            ("Device Type:", self.device_type),
-        ):
-            credentials_layout.addWidget(QtWidgets.QLabel(label))
-            credentials_layout.addWidget(widget)
+
+        self.password_input = _secret_input()
+        self.password_row = _labelled("Password:", self.password_input)
+
+        self.key_file_input = QtWidgets.QLineEdit()
+        self.key_file_input.setPlaceholderText("Default key or ssh-agent")
+        self.key_file_input.setToolTip(
+            "Leave blank to use ~/.ssh/id_ed25519, id_ecdsa or id_rsa, then ssh-agent"
+        )
+        browse = QtWidgets.QToolButton()
+        browse.setText("…")
+        browse.setToolTip("Choose a private key file")
+        browse.clicked.connect(self.browse_key_file)
+        key_line = QtWidgets.QHBoxLayout()
+        key_line.setContentsMargins(0, 0, 0, 0)
+        key_line.addWidget(self.key_file_input, 1)
+        key_line.addWidget(browse)
+        key_line_widget = QtWidgets.QWidget()
+        key_line_widget.setLayout(key_line)
+        self.passphrase_input = _secret_input()
+        self.passphrase_input.setPlaceholderText("Only if the key is encrypted")
+        self.key_row = QtWidgets.QWidget()
+        key_layout = QtWidgets.QVBoxLayout(self.key_row)
+        key_layout.setContentsMargins(0, 0, 0, 0)
+        key_layout.addWidget(_labelled("Key File:", key_line_widget))
+        key_layout.addWidget(_labelled("Key Passphrase:", self.passphrase_input))
+
+        credentials_layout.addWidget(_labelled("Username:", self.username_input))
+        credentials_layout.addWidget(_labelled("Login With:", self.auth_method))
+        credentials_layout.addWidget(self.password_row)
+        credentials_layout.addWidget(self.key_row)
+        credentials_layout.addWidget(_labelled("Device Type:", self.device_type))
+        self._update_auth_fields()
 
         controls_group = QtWidgets.QGroupBox("Controls")
         controls_group.setObjectName("sidebar-group")
@@ -224,7 +252,16 @@ class DeviceManager(QtWidgets.QMainWindow):
         sidebar_layout.addWidget(controls_group)
         sidebar_layout.addWidget(self.progress_bar)
         sidebar_layout.addStretch()
-        return sidebar_widget
+
+        # Scrolls instead of squashing fields when the window is shorter than the sidebar.
+        scroll = QtWidgets.QScrollArea()
+        scroll.setObjectName("sidebar_scroll")
+        scroll.setWidget(sidebar_widget)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFixedWidth(316)
+        return scroll
 
     def _build_content(self) -> QtWidgets.QWidget:
         """Device and command inputs above the output table."""
@@ -337,6 +374,34 @@ class DeviceManager(QtWidgets.QMainWindow):
             style.unpolish(self.pause_btn)
             style.polish(self.pause_btn)
 
+    def _update_auth_fields(self) -> None:
+        uses_key = self.current_auth_method() is AuthMethod.SSH_KEY
+        self.password_row.setVisible(not uses_key)
+        self.key_row.setVisible(uses_key)
+
+    def current_auth_method(self) -> AuthMethod:
+        method = self.auth_method.currentData()
+        return method if isinstance(method, AuthMethod) else AuthMethod.PASSWORD
+
+    def set_auth_method(self, method: AuthMethod) -> None:
+        self.auth_method.setCurrentIndex(max(0, self.auth_method.findData(method)))
+
+    def auth_config(self) -> AuthConfig:
+        return AuthConfig(
+            method=self.current_auth_method(),
+            password=self.password_input.text(),
+            key_file=self.key_file_input.text().strip(),
+            passphrase=self.passphrase_input.text(),
+        )
+
+    def browse_key_file(self) -> None:
+        start = self.key_file_input.text().strip() or str(Path.home() / ".ssh")
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Choose SSH Private Key", start, "All Files (*)"
+        )
+        if filename:
+            self.key_file_input.setText(filename)
+
     def _status(self, message: str) -> None:
         bar = self.statusBar()
         if bar is not None:
@@ -372,9 +437,14 @@ class DeviceManager(QtWidgets.QMainWindow):
 
     def run_commands(self) -> None:
         username = self.username_input.text().strip()
-        password = self.password_input.text()
-        if not username or not password:
-            self._warn("Please enter username and password")
+        if not username:
+            self._warn("Please enter a username")
+            return
+        auth = self.auth_config()
+        try:
+            auth.validate()
+        except AuthError as e:
+            self._warn(str(e))
             return
 
         devices = _lines(self.devices_input.toPlainText())
@@ -408,13 +478,14 @@ class DeviceManager(QtWidgets.QMainWindow):
                 "device_type": self.device_type.currentText(),
                 "host": device,
                 "username": username,
-                "password": password,
+                **auth.connection_params(),
             }
             for device in devices
         ]
         logger.info(
-            "Run started by %s: %d devices, %d commands, mode=%s",
+            "Run started by %s (%s): %d devices, %d commands, mode=%s",
             username,
+            auth.describe(),
             len(devices),
             len(commands),
             mode_str,
@@ -485,6 +556,8 @@ class DeviceManager(QtWidgets.QMainWindow):
         path = Path(filename)
         session = Session(
             username=self.username_input.text(),
+            auth_method=self.current_auth_method().value,
+            key_file=self.key_file_input.text().strip(),
             device_type=self.device_type.currentText(),
             devices=self.devices_input.toPlainText(),
             commands=self.commands_input.toPlainText(),
@@ -516,6 +589,8 @@ class DeviceManager(QtWidgets.QMainWindow):
             return
 
         self.username_input.setText(session.username)
+        self.set_auth_method(AuthMethod(session.auth_method))
+        self.key_file_input.setText(session.key_file)
         self.devices_input.setPlainText(session.devices)
         self.commands_input.setPlainText(session.commands)
         index = self.device_type.findText(session.device_type)
@@ -549,6 +624,14 @@ class DeviceManager(QtWidgets.QMainWindow):
         """Save credentials to the OS keyring."""
         username = self.username_input.text().strip()
         password = self.password_input.text()
+        if self.current_auth_method() is AuthMethod.SSH_KEY:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Nothing to Save",
+                "SSH key login has no password to store. Save a session to keep the "
+                "username and key file.",
+            )
+            return
         if not username or not password:
             QtWidgets.QMessageBox.warning(self, "Error", "Please enter username and password")
             return
@@ -591,6 +674,7 @@ class DeviceManager(QtWidgets.QMainWindow):
             )
             return
         self.username_input.setText(username)
+        self.set_auth_method(AuthMethod.PASSWORD)
         self.password_input.setText(password)
         QtWidgets.QMessageBox.information(self, "Success", "Credentials loaded successfully")
 
@@ -681,6 +765,26 @@ class DeviceManager(QtWidgets.QMainWindow):
 
     def show_network_settings(self) -> None:
         NetworkSettingsDialog(self).exec()
+
+
+def _secret_input() -> QtWidgets.QLineEdit:
+    field = QtWidgets.QLineEdit()
+    field.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+    field.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+    return field
+
+
+def _labelled(label: str, widget: QtWidgets.QWidget) -> QtWidgets.QWidget:
+    """Label above field, as one widget so a whole row can be shown or hidden."""
+    row = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(row)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(4)
+    caption = QtWidgets.QLabel(label)
+    caption.setObjectName("field_label")
+    layout.addWidget(caption)
+    layout.addWidget(widget)
+    return row
 
 
 def _lines(text: str) -> list[str]:

@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='NetMate-1.3.0',
+    name='NetMate-1.4.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=True,

@@ -351,3 +351,13 @@ QScrollBar::handle:horizontal {
     min-width: 24px;
     border-radius: 6px;
 }
+
+QScrollArea#sidebar_scroll, QScrollArea#sidebar_scroll > QWidget > QWidget {
+    background: transparent;
+}
+
+/* Sidebar field captions sit tight above their inputs */
+QLabel#field_label {
+    margin-bottom: 0px;
+    margin-top: 2px;
+}

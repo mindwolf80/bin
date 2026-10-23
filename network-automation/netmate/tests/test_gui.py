@@ -23,8 +23,10 @@ from pytestqt.qtbot import QtBot
 import engine
 import main
 from app_logging import LOG_FILE
+from auth import AuthMethod
 from engine import Settings
 from table_widgets import LogViewerDialog, Status
+from tests.conftest import KEY_PASSPHRASE, SshKeys
 from tests.fake_ios import PASSWORD, USERNAME, FakeIosServer
 
 Button = QtWidgets.QMessageBox.StandardButton
@@ -196,8 +198,8 @@ def test_second_run_clears_previous_results(qtbot: QtBot, window: main.DeviceMan
 @pytest.mark.parametrize(
     ("field_name", "message"),
     [
-        ("username_input", "username and password"),
-        ("password_input", "username and password"),
+        ("username_input", "enter a username"),
+        ("password_input", "enter a password, or choose SSH key login"),
         ("devices_input", "at least one device"),
         ("commands_input", "at least one command"),
     ],
@@ -558,3 +560,123 @@ def test_linux_qt_dependency_check(
 
     monkeypatch.setattr(main.ctypes.util, "find_library", find_library)
     assert (main.missing_linux_qt_dependency() is not None) is expect_problem
+
+
+# --------------------------------------------------------------------------- SSH key login
+
+
+def test_auth_method_switches_fields(window: main.DeviceManager) -> None:
+    window.show()
+    assert window.password_row.isVisible()
+    assert not window.key_row.isVisible()
+    window.set_auth_method(AuthMethod.SSH_KEY)
+    assert not window.password_row.isVisible()
+    assert window.key_row.isVisible()
+
+
+def test_key_login_needs_no_password(
+    qtbot: QtBot, window: main.DeviceManager, ssh_keys: SshKeys, dialogs: Dialogs
+) -> None:
+    window.password_input.clear()
+    window.set_auth_method(AuthMethod.SSH_KEY)
+    window.key_file_input.setText(str(ssh_keys.plain))
+    window.run_btn.click()
+    assert dialogs.messages == []
+    params = window.workers[0].engine.devices[0]
+    assert params["use_keys"] is True
+    assert params["key_file"] == str(ssh_keys.plain)
+    assert params["password"] == ""
+    finish(qtbot, window)
+    assert len(window.results) == 4
+
+
+@pytest.mark.parametrize(
+    ("key", "passphrase", "message"),
+    [
+        ("missing", "", "not found"),
+        ("encrypted", "", "enter its passphrase"),
+        ("encrypted", "wrong", "Wrong passphrase"),
+    ],
+)
+def test_bad_key_is_reported_before_connecting(
+    window: main.DeviceManager,
+    *,
+    ssh_keys: SshKeys,
+    dialogs: Dialogs,
+    key: str,
+    passphrase: str,
+    message: str,
+) -> None:
+    path = ssh_keys.encrypted if key == "encrypted" else ssh_keys.plain.with_name("missing")
+    window.set_auth_method(AuthMethod.SSH_KEY)
+    window.key_file_input.setText(str(path))
+    window.passphrase_input.setText(passphrase)
+    window.run_btn.click()
+    assert not window.workers
+    assert dialogs.kinds() == ["warning"]
+    assert message in dialogs.messages[0][1]
+
+
+def test_browse_sets_key_file(
+    window: main.DeviceManager, dialogs: Dialogs, ssh_keys: SshKeys
+) -> None:
+    dialogs.open_path = str(ssh_keys.plain)
+    window.browse_key_file()
+    assert window.key_file_input.text() == str(ssh_keys.plain)
+
+
+def test_session_keeps_key_path_but_not_passphrase(
+    qtbot: QtBot, window: main.DeviceManager, dialogs: Dialogs, ssh_keys: SshKeys, tmp_path: Path
+) -> None:
+    window.set_auth_method(AuthMethod.SSH_KEY)
+    window.key_file_input.setText(str(ssh_keys.encrypted))
+    window.passphrase_input.setText(KEY_PASSPHRASE)
+    dialogs.save_path = str(tmp_path / "s.json")
+    window.save_session()
+    saved = Path(dialogs.save_path).read_text(encoding="utf-8")
+    assert KEY_PASSPHRASE not in saved
+    assert "secret" not in saved  # the password field's content
+
+    fresh = main.DeviceManager()
+    qtbot.addWidget(fresh)
+    dialogs.open_path = dialogs.save_path
+    fresh.load_session()
+    assert fresh.current_auth_method() is AuthMethod.SSH_KEY
+    assert fresh.key_file_input.text() == str(ssh_keys.encrypted)
+    assert fresh.passphrase_input.text() == ""
+
+
+def test_save_credentials_in_key_mode_explains(
+    window: main.DeviceManager, dialogs: Dialogs
+) -> None:
+    window.set_auth_method(AuthMethod.SSH_KEY)
+    window.save_credentials()
+    assert dialogs.kinds() == ["information"]
+    assert "no password to store" in dialogs.messages[0][1]
+
+
+@pytest.mark.integration
+def test_gui_key_login_against_real_ssh(
+    qtbot: QtBot, dialogs: Dialogs, monkeypatch: pytest.MonkeyPatch, ssh_keys: SshKeys
+) -> None:
+    with FakeIosServer(authorized_keys=ssh_keys.authorized_pubs, allow_password=False) as server:
+        real_connect = engine.ConnectHandler
+
+        def with_port(**params: Any) -> Any:
+            return real_connect(**params, port=server.port)
+
+        monkeypatch.setattr(engine, "ConnectHandler", with_port)
+        w = main.DeviceManager()
+        qtbot.addWidget(w)
+        w.username_input.setText(USERNAME)
+        w.set_auth_method(AuthMethod.SSH_KEY)
+        w.key_file_input.setText(str(ssh_keys.encrypted))
+        w.passphrase_input.setText(KEY_PASSPHRASE)
+        w.device_type.setCurrentText("cisco_ios")
+        w.devices_input.setPlainText("127.0.0.1\n127.0.0.1")
+        w.commands_input.setPlainText("show version")
+        w.run_btn.click()
+        finish(qtbot, w, timeout=60_000)
+
+    assert [r.status for r in w.results] == ["OK", "OK"]
+    assert all("R1 uptime" in r.output for r in w.results)
